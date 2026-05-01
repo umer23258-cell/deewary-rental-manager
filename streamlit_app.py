@@ -9,132 +9,130 @@ key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 # --- 2. PAGE CONFIG ---
-st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
+st.set_page_config(page_title="Deewary - Property Portal", layout="wide", page_icon="🏢")
 
-# --- 3. CUSTOM CSS (Focused on Button Shape & Size) ---
+# --- 3. ZAMEEN STYLE CSS ---
 st.markdown("""
     <style>
-    /* Sidebar ki width ko standard rakha hai */
-    [data-testid="stSidebar"] {
-        min-width: 300px !important;
-    }
-
-    /* Buttons ka shape chota aur sleek banane ke liye */
-    div.stButton > button {
-        height: 28px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-        font-size: 12px !important;
-        font-weight: 500;
-        border-radius: 4px;
-        border: 1px solid #34495e;
-        margin-bottom: -10px; /* Buttons ke darmiyan gap kam karne ke liye */
-    }
-
-    /* Sidebar headers styling */
-    .sidebar-header {
-        color: #FF4B4B;
-        font-weight: bold;
-        font-size: 14px;
-        margin-top: 15px;
-        margin-bottom: 2px;
-        border-bottom: 1px solid #444;
-    }
+    /* Main Background & Font */
+    [data-testid="stAppViewContainer"] { background-color: #f8f9fa; }
     
-    /* Input fields and selectbox in sidebar ko bhi thoda compact kiya */
-    .stSelectbox, .stTextInput {
-        margin-bottom: -10px;
+    /* Sidebar Zameen Green Theme */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e0e0e0;
     }
+
+    /* Modern Green Buttons (Zameen Style) */
+    div.stButton > button {
+        width: 100%;
+        height: 35px !important;
+        background-color: #27a344 !important; /* Zameen Green */
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        margin-bottom: -12px;
+        transition: 0.3s;
+    }
+
+    /* Button Hover */
+    div.stButton > button:hover {
+        background-color: #1e7e34 !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+    }
+
+    /* Sidebar Headers */
+    .section-tag {
+        color: #333333;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-top: 20px;
+        margin-bottom: 5px;
+        letter-spacing: 0.5px;
+        color: #666;
+    }
+
+    /* Hide Streamlit elements */
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. HELPERS ---
-def save_rec(table, data):
-    supabase.table(table).insert(data).execute()
-    st.success(f"Saved in {table}!")
+# --- 4. NAVIGATION LOGIC ---
+st.sidebar.image("https://www.zameen.com/assets/zameen-logo-en.f94086d7734a7803e7e22f28b3a0e695.svg", width=150) # Just for vibe
+st.sidebar.markdown("<h3 style='color: #27a344; margin-top:-10px;'>Property Admin</h3>", unsafe_allow_html=True)
 
-# --- 5. SIDEBAR NAVIGATION ---
-st.sidebar.title("🏢 DEEWARY ADMIN")
-user_name = st.sidebar.selectbox("Personnel", ["Anas", "Sawer Khan", "Tariq Hussain"])
+user_name = st.sidebar.selectbox("User", ["Anas", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
-    # --- PROPERTIES ---
-    st.sidebar.markdown('<p class="sidebar-header">🏠 PROPERTIES</p>', unsafe_allow_html=True)
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("➕ Reg"): st.session_state.page = "reg_prop"
-    with col2:
-        if st.button("📋 Hist"): st.session_state.page = "hist_prop"
+    
+    # --- PROPERTIES SECTION ---
+    st.sidebar.markdown('<p class="section-tag">Homes & Plots</p>', unsafe_allow_html=True)
+    c1, c2 = st.sidebar.columns(2)
+    with c1:
+        if st.button("➕ Add New"): st.session_state.page = "add_p"
+    with c2:
+        if st.button("📋 Inventory"): st.session_state.page = "view_p"
 
-    # --- CLIENTS ---
-    st.sidebar.markdown('<p class="sidebar-header">👥 CLIENTS</p>', unsafe_allow_html=True)
-    col3, col4 = st.sidebar.columns(2)
-    with col3:
-        if st.button("➕ Reg Client"): st.session_state.page = "reg_client"
-    with col4:
-        if st.button("📋 Hist Client"): st.session_state.page = "hist_client"
+    # --- CLIENTS SECTION ---
+    st.sidebar.markdown('<p class="section-tag">Clients & Leads</p>', unsafe_allow_html=True)
+    c3, c4 = st.sidebar.columns(2)
+    with c3:
+        if st.button("➕ New Lead"): st.session_state.page = "add_c"
+    with c4:
+        if st.button("📋 All Leads"): st.session_state.page = "view_c"
 
-    # --- TASKS ---
-    st.sidebar.markdown('<p class="sidebar-header">⏳ PENDING TASKS</p>', unsafe_allow_html=True)
-    col5, col6 = st.sidebar.columns(2)
-    with col5:
-        if st.button("➕ Add Task"): st.session_state.page = "reg_task"
-    with col6:
-        if st.button("📋 Task List"): st.session_state.page = "hist_task"
+    # --- OPERATIONS SECTION ---
+    st.sidebar.markdown('<p class="section-tag">Field Operations</p>', unsafe_allow_html=True)
+    c5, c6 = st.sidebar.columns(2)
+    with c5:
+        if st.button("⏳ Tasks"): st.session_state.page = "add_t"
+    with c6:
+        if st.button("📋 Task Log"): st.session_state.page = "view_t"
 
-    # --- VISITS ---
-    st.sidebar.markdown('<p class="sidebar-header">📍 SITE VISITS</p>', unsafe_allow_html=True)
-    col7, col8 = st.sidebar.columns(2)
-    with col7:
-        if st.button("➕ Log Visit"): st.session_state.page = "reg_visit"
-    with col8:
-        if st.button("📋 Visit Log"): st.session_state.page = "hist_visit"
+    c7, c8 = st.sidebar.columns(2)
+    with c7:
+        if st.button("📍 Visits"): st.session_state.page = "add_v"
+    with c8:
+        if st.button("📋 Visit Log"): st.session_state.page = "view_v"
 
-    # --- DEALS ---
-    st.sidebar.markdown('<p class="sidebar-header">🤝 DEALS DONE</p>', unsafe_allow_html=True)
-    col9, col10 = st.sidebar.columns(2)
-    with col9:
-        if st.button("🏆 Record Deal"): st.session_state.page = "reg_deal"
-    with col10:
-        if st.button("📋 Deal Hist"): st.session_state.page = "hist_deal"
+    # --- SUCCESS SECTION ---
+    st.sidebar.markdown('<p class="section-tag">Successful Deals</p>', unsafe_allow_html=True)
+    c9, c10 = st.sidebar.columns(2)
+    with c9:
+        if st.button("🤝 Close Deal"): st.session_state.page = "add_d"
+    with c10:
+        if st.button("📜 Deal History"): st.session_state.page = "view_d"
 
-    # --- SEARCH ---
-    st.sidebar.markdown('<p class="sidebar-header">🔍 REPORTS</p>', unsafe_allow_html=True)
-    if st.sidebar.button("🔎 Search & PDF Report"): st.session_state.page = "search"
+    # --- REPORTS ---
+    st.sidebar.markdown('<p class="section-tag">Reports Center</p>', unsafe_allow_html=True)
+    if st.sidebar.button("🔎 Search & Export PDF"): st.session_state.page = "report"
 
-    # Default Page
-    if "page" not in st.session_state: st.session_state.page = "hist_prop"
-
-    # --- 6. PAGE CONTENT ---
+    # --- PAGE ROUTING ---
+    if "page" not in st.session_state: st.session_state.page = "view_p"
     pg = st.session_state.page
 
-    # Example Logic for View (Repeated for all categories)
-    if pg.startswith("hist_"):
-        table_name = {
-            "hist_prop": "house_inventory",
-            "hist_client": "client_leads",
-            "hist_task": "pending_tasks",
-            "hist_visit": "site_visits",
-            "hist_deal": "deals_done"
-        }[pg]
-        st.subheader(f"📋 {table_name.replace('_', ' ').upper()} RECORDS")
-        res = supabase.table(table_name).select("*").execute()
-        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
-
-    elif pg == "reg_prop":
-        st.subheader("🏡 New Property Registration")
-        with st.form("p_form"):
-            o_name = st.text_input("Owner Name")
-            loc = st.text_input("Location")
-            rent = st.number_input("Rent", min_value=0)
-            if st.form_submit_button("Save"):
-                save_rec("house_inventory", {"owner_name": o_name, "location": loc, "rent": rent, "added_by": user_name})
-
-    # (Aap baki forms bhi isi tarah add kar sakte hain...)
+    # --- DISPLAY LOGIC ---
+    if pg.startswith("view_"):
+        st.info(f"Viewing {pg.split('_')[1].upper()} Records")
+        # Yahan aapka database fetch ka code aayega
+        
+    elif pg == "add_p":
+        st.subheader("🏠 Property Registration")
+        with st.form("prop_form"):
+            st.text_input("Property Title")
+            st.selectbox("City", ["Islamabad", "Rawalpindi", "Lahore"])
+            st.form_submit_button("Submit Property")
 
 else:
-    st.info("Sidebar se Access Code enter karein.")
+    st.sidebar.warning("Please enter the admin code.")
 
-st.divider()
-st.caption(f"© {datetime.now().year} Deewary.com | All Records Separated")
+# Main Header Design
+st.markdown("""
+    <div style="background-color: #27a344; padding: 10px; border-radius: 5px; text-align: center;">
+        <h2 style="color: white; margin: 0;">DEEWARY PROPERTY MANAGEMENT</h2>
+    </div>
+""", unsafe_allow_html=True)
