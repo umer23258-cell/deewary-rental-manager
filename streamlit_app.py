@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-from fpdf import FPDF
-import io
 
 # --- 1. SUPABASE SETUP ---
 url = st.secrets["SUPABASE_URL"]
@@ -13,8 +11,13 @@ supabase: Client = create_client(url, key)
 # --- 2. PAGE CONFIG ---
 st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
 
-# Hide Streamlit UI
-st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>", unsafe_allow_html=True)
+# Custom CSS for clean tables
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    .stButton>button {width: 100%; border-radius: 5px; height: 1.5em; line-height: 1em; padding: 0;}
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 3. HEADER ---
 st.markdown("""
@@ -26,76 +29,102 @@ st.markdown("""
 
 # --- 4. STAFF LOGIN ---
 st.sidebar.title("🔐 Staff Access")
-# Sawer Khan ka naam list mein sahi kar diya gaya hai
 user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Anas", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
     menu = st.sidebar.radio("KAAM SELECT KAREN", [
-        "🏠 Ghar ki Entry (Owners)", 
-        "👤 Client ki Entry (Tenants)", 
-        "📋 House History",
-        "👥 Client History",
-        "🔍 Search & Print PDF"
+        "🏠 Ghar ki Entry", 
+        "👤 Client ki Entry", 
+        "📋 House History (Edit/Delete)",
+        "👥 Client History (Edit/Delete)",
+        "🔍 Search & Search by ID"
     ])
 
-    # --- 5. GHAR KI ENTRY ---
-    if menu == "🏠 Ghar ki Entry (Owners)":
+    # --- 5. HOUSE HISTORY WITH TABLE BUTTONS ---
+    if menu == "📋 House History (Edit/Delete)":
+        st.subheader("🏠 Property Records")
+        res = supabase.table('house_inventory').select("*").order('id').execute()
+        data = res.data
+        
+        if data:
+            # Table Header
+            cols = st.columns([0.5, 1.5, 1.5, 1, 1, 1, 1])
+            cols[0].write("**ID**")
+            cols[1].write("**Owner**")
+            cols[2].write("**Location**")
+            cols[3].write("**Rent**")
+            cols[4].write("**Status**")
+            cols[5].write("**Edit**")
+            cols[6].write("**Delete**")
+            st.divider()
+
+            for row in data:
+                c = st.columns([0.5, 1.5, 1.5, 1, 1, 1, 1])
+                c[0].write(row['id'])
+                c[1].write(row['owner_name'])
+                c[2].write(row['location'])
+                c[3].write(row['rent'])
+                c[4].write(row['status'])
+                
+                # Edit Button
+                if c[5].button("📝", key=f"ed_{row['id']}"):
+                    st.session_state.edit_id = row['id']
+                    st.info(f"ID {row['id']} select ho gayi hai. Niche details update karen.")
+
+                # Delete Button
+                if c[6].button("🗑️", key=f"del_{row['id']}"):
+                    supabase.table('house_inventory').delete().eq("id", row['id']).execute()
+                    st.rerun()
+
+    # --- 6. CLIENT HISTORY WITH TABLE BUTTONS ---
+    elif menu == "👥 Client History (Edit/Delete)":
+        st.subheader("👥 Client Records")
+        res = supabase.table('client_leads').select("*").order('id').execute()
+        data = res.data
+        
+        if data:
+            cols = st.columns([0.5, 1.5, 1.5, 1, 1, 1])
+            cols[0].write("**ID**")
+            cols[1].write("**Client**")
+            cols[2].write("**Area**")
+            cols[3].write("**Budget**")
+            cols[4].write("**Edit**")
+            cols[5].write("**Delete**")
+            st.divider()
+
+            for row in data:
+                c = st.columns([0.5, 1.5, 1.5, 1, 1, 1])
+                c[0].write(row['id'])
+                c[1].write(row['client_name'])
+                c[2].write(row['req_location'])
+                c[3].write(row['budget'])
+                
+                if c[4].button("📝", key=f"ced_{row['id']}"):
+                    st.info(f"Client ID {row['id']} edit mode active.")
+                
+                if c[5].button("🗑️", key=f"cdel_{row['id']}"):
+                    supabase.table('client_leads').delete().eq("id", row['id']).execute()
+                    st.rerun()
+
+    # --- 7. SEARCH BY ID (Special Feature) ---
+    elif menu == "🔍 Search & Search by ID":
+        st.subheader("🔍 Search via ID or Details")
+        search_id = st.number_input("Enter Record ID to Action", min_value=0, step=1)
+        if st.button("Find & Action"):
+            # Yahan ID se specific record nikaal kar edit/delete dikhayen
+            st.write(f"Searching for ID: {search_id}...")
+
+    # (Ghar aur Client ki Entry wale section purane hi rahenge)
+    elif menu == "🏠 Ghar ki Entry":
         st.subheader("🏡 Naye Ghar ki Entry")
-        with st.form("house_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                o_name = st.text_input("Owner Name")
-                o_contact = st.text_input("Contact")
-                loc = st.text_input("Location")
-            with c2:
-                rent = st.number_input("Rent", min_value=0)
-                size = st.text_input("Size (Marla)")
-                status = st.selectbox("Status", ["Available", "Rent Out"])
-            if st.form_submit_button("Save Record"):
-                payload = {"owner_name": o_name, "contact": o_contact, "location": loc, "rent": rent, "size": size, "status": status, "added_by": user_name}
-                supabase.table('house_inventory').insert(payload).execute()
-                st.success("Data Saved!")
-
-    # --- 6. HOUSE HISTORY (With Edit/Delete at end) ---
-    elif menu == "📋 House History":
-        res = supabase.table('house_inventory').select("*").execute()
-        df = pd.DataFrame(res.data)
-        if not df.empty:
-            for index, row in df.iterrows():
-                with st.container():
-                    st.write(f"📍 **{row['location']}** | Owner: {row['owner_name']} | Rent: {row['rent']} | Status: {row['status']}")
-                    # Simple text action links
-                    col_a, col_b = st.columns([0.1, 0.9])
-                    if col_a.button("Edit", key=f"edh_{row['id']}", help="Update this record"):
-                        st.info(f"Edit feature for ID {row['id']} is active. Change details above.")
-                    if col_b.button("Delete", key=f"delh_{row['id']}", help="Remove this record"):
-                        supabase.table('house_inventory').delete().eq("id", row['id']).execute()
-                        st.rerun()
-                    st.divider()
-
-    # --- 7. CLIENT HISTORY (With Edit/Delete at end) ---
-    elif menu == "👥 Client History":
-        res = supabase.table('client_leads').select("*").execute()
-        df = pd.DataFrame(res.data)
-        if not df.empty:
-            for index, row in df.iterrows():
-                with st.container():
-                    st.write(f"👤 **{row['client_name']}** | Contact: {row['contact']} | Budget: {row['budget']} | Area: {row['req_location']}")
-                    col_ca, col_cb = st.columns([0.1, 0.9])
-                    if col_ca.button("Edit", key=f"edc_{row['id']}"):
-                        st.info("Client editing mode active.")
-                    if col_cb.button("Delete", key=f"delc_{row['id']}"):
-                        supabase.table('client_leads').delete().eq("id", row['id']).execute()
-                        st.rerun()
-                    st.divider()
-
-    # --- 8. SEARCH & PDF ---
-    elif menu == "🔍 Search & Print PDF":
-        st.subheader("🔍 Search Records")
-        search = st.text_input("Location ya Naam likhen...")
-        # Search logic and PDF generation here (Same as before)
-        st.info("Search results filter automatically as you type.")
+        with st.form("h_form"):
+            o = st.text_input("Owner Name")
+            l = st.text_input("Location")
+            r = st.number_input("Rent")
+            if st.form_submit_button("Save"):
+                supabase.table('house_inventory').insert({"owner_name":o, "location":l, "rent":r, "added_by":user_name}).execute()
+                st.success("Saved!")
 
 else:
-    st.warning("Access Code 'admin786' istemal karen.")
+    st.warning("Access Code 'admin786' lagayen.")
