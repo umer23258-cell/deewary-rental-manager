@@ -10,82 +10,90 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- 2. PAGE CONFIG & PREMIUM THEME ---
-st.set_page_config(page_title="Deewary Admin Portal", layout="wide", page_icon="🏢")
+# --- 2. PAGE CONFIG & DARK ORANGE THEME ---
+st.set_page_config(page_title="Deewary Pro Admin", layout="wide", page_icon="🏢")
 
-# Custom CSS for Premium Dashboard Look
 st.markdown("""
     <style>
-    /* Hide Streamlit elements */
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    
-    /* Global Background and Font */
+    /* Main Dark Background */
     [data-testid="stAppViewContainer"] {
-        background-color: #f8f9fa;
+        background-color: #0E1117;
+        color: #FFFFFF;
     }
     
-    /* Sidebar Styling */
+    /* Sidebar Dark Styling */
     [data-testid="stSidebar"] {
-        background-color: #111;
-        color: white;
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
     }
-    
-    /* Professional Cards for Metrics */
+
+    /* Professional Orange Metrics */
     .metric-card {
-        background-color: white;
+        background-color: #1C2128;
         padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border-bottom: 4px solid #cc0000;
-        text-align: center;
-    }
-    
-    /* Staff Performance Boxes */
-    .staff-card {
-        background: linear-gradient(135deg, #1e1e1e 0%, #333 100%);
-        color: #fff;
-        padding: 15px;
         border-radius: 10px;
-        margin-bottom: 12px;
-        border-left: 6px solid #cc0000;
-    }
-    
-    /* Success/Button Styling */
-    .stButton>button {
-        background-color: #cc0000;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 10px 20px;
+        border: 1px solid #30363D;
+        border-top: 4px solid #FF8C00; /* Electric Orange */
+        text-align: center;
         transition: 0.3s;
     }
+    .metric-card:hover {
+        border-color: #FF8C00;
+        transform: translateY(-5px);
+    }
+    
+    /* Staff Performance Cards */
+    .staff-card {
+        background-color: #1C2128;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border-left: 5px solid #FF8C00;
+        color: #E6EDF3;
+    }
+
+    /* Orange Buttons */
+    .stButton>button {
+        background-color: #FF8C00;
+        color: #000;
+        font-weight: bold;
+        border-radius: 5px;
+        border: none;
+        width: 100%;
+    }
     .stButton>button:hover {
-        background-color: #ff3333;
-        box-shadow: 0 4px 12px rgba(204,0,0,0.3);
+        background-color: #FFA500;
+        color: #000;
+    }
+
+    /* Inputs Styling */
+    input, select, textarea {
+        background-color: #0D1117 !important;
+        color: white !important;
+        border: 1px solid #30363D !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. PDF FUNCTION ---
+# --- 3. PDF FUNCTION (Table Format) ---
 def generate_pdf(df, title):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
+    pdf.set_fill_color(255, 140, 0) # Orange Header
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, txt=title, ln=True, align='C')
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.set_fill_color(204, 0, 0) # Dark Red Header
-    pdf.set_text_color(255, 255, 255)
     
-    col_width = [15, 40, 60, 25, 25, 30, 30, 40]
+    pdf.set_font("Arial", 'B', 10)
     headers = ["ID", "Owner", "Location", "Portion", "Beds", "Rent", "Size", "Status"]
+    col_width = [15, 40, 60, 25, 25, 30, 30, 40]
+    
     for i in range(len(headers)):
         pdf.cell(col_width[i], 10, headers[i], 1, 0, 'C', 1)
     pdf.ln()
     
     pdf.set_font("Arial", size=9)
-    pdf.set_text_color(0, 0, 0)
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         pdf.cell(col_width[0], 10, str(row.get('id', '')), 1)
         pdf.cell(col_width[1], 10, str(row.get('owner_name', ''))[:15], 1)
         pdf.cell(col_width[2], 10, str(row.get('location', ''))[:25], 1)
@@ -97,144 +105,118 @@ def generate_pdf(df, title):
         pdf.ln()
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. SLEEK HEADER ---
+# --- 4. HEADER ---
 st.markdown("""
-    <div style="background-color: #111; padding: 15px; border-radius: 10px; border-left: 8px solid #cc0000; margin-bottom: 25px;">
-        <h2 style="color: white; margin: 0; font-family: 'Trebuchet MS';">DEEWARY<span style="color: #cc0000;">.COM</span></h2>
-        <p style="color: #bbb; margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px;">Real Estate & Construction Management</p>
+    <div style="background-color: #161B22; padding: 15px; border-radius: 10px; border-bottom: 2px solid #FF8C00; margin-bottom: 20px;">
+        <h2 style="color: #FF8C00; margin: 0; font-family: 'Segoe UI';">DEEWARY<span style="color: white;">.PRO</span></h2>
+        <p style="color: #8B949E; margin: 0; font-size: 12px; letter-spacing: 1px;">MANAGEMENT INTERFACE v2.0</p>
     </div>
 """, unsafe_allow_html=True)
 
-# --- 5. STAFF LOGIN ---
-st.sidebar.markdown("### 🏢 Admin Access")
-user_name = st.sidebar.selectbox("Select User", ["Anas", "Sawer Khan", "Tariq Hussain"])
-pwd = st.sidebar.text_input("Access Code", type="password")
+# --- 5. AUTH & NAVIGATION ---
+user_name = st.sidebar.selectbox("User Account", ["Anas", "Sawer Khan", "Tariq Hussain"])
+pwd = st.sidebar.text_input("Security Pin", type="password")
 
 if pwd == "admin786":
-    menu = st.sidebar.radio("DASHBOARD MENU", [
-        "📊 Daily Performance", 
-        "🏠 Property Inventory", 
-        "👤 Client Leads", 
-        "📋 Database History",
-        "🛠️ Admin Control (Edit/Delete)",
-        "🔍 Report Generator"
+    menu = st.sidebar.radio("NAVIGATE", [
+        "📈 Daily Insights", 
+        "📥 Data Entry", 
+        "📂 Database History",
+        "🛠️ Admin Tools",
+        "🖨️ Export Reports"
     ])
 
-    # --- 6. DAILY PERFORMANCE ---
-    if menu == "📊 Daily Performance":
-        st.markdown("### 📈 Today's Activity Overview")
-        today_date = date.today().isoformat()
+    # --- 6. DAILY INSIGHTS ---
+    if menu == "📈 Daily Insights":
+        st.markdown("### 📊 Today's Performance Metrics")
+        today = date.today().isoformat()
         
-        # Fetching data
-        h_res = supabase.table('house_inventory').select("*").gte('created_at', today_date).execute()
-        c_res = supabase.table('client_leads').select("*").gte('created_at', today_date).execute()
+        h_data = supabase.table('house_inventory').select("*").gte('created_at', today).execute()
+        c_data = supabase.table('client_leads').select("*").gte('created_at', today).execute()
         
-        df_h = pd.DataFrame(h_res.data)
-        df_c = pd.DataFrame(c_res.data)
+        df_h = pd.DataFrame(h_data.data)
+        df_c = pd.DataFrame(c_data.data)
 
-        # Metrics Row
-        m1, m2, m3 = st.columns(3)
-        with m1:
-            st.markdown(f'<div class="metric-card"><h2 style="color:#cc0000;">{len(df_h)}</h2><p>New Properties</p></div>', unsafe_allow_html=True)
-        with m2:
-            st.markdown(f'<div class="metric-card"><h2 style="color:#cc0000;">{len(df_c)}</h2><p>New Leads</p></div>', unsafe_allow_html=True)
-        with m3:
-            rent_outs = len(df_h[df_h['status'] == 'Rent Out']) if not df_h.empty else 0
-            st.markdown(f'<div class="metric-card"><h2 style="color:#28a745;">{rent_outs}</h2><p>Units Rented Out</p></div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="metric-card"><h3>{len(df_h)}</h3><p style="color:#8B949E;">Houses Added</p></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="metric-card"><h3>{len(df_c)}</h3><p style="color:#8B949E;">Leads Created</p></div>', unsafe_allow_html=True)
+        with c3:
+            closed = len(df_h[df_h['status'] == 'Rent Out']) if not df_h.empty else 0
+            st.markdown(f'<div class="metric-card"><h3 style="color:#00FF00;">{closed}</h3><p style="color:#8B949E;">Deals Closed</p></div>', unsafe_allow_html=True)
 
-        st.markdown("<br>### 👤 Staff Performance Report", unsafe_allow_html=True)
+        st.markdown("<br>#### 👤 Staff Contribution", unsafe_allow_html=True)
         for staff in ["Anas", "Sawer Khan", "Tariq Hussain"]:
-            s_h = len(df_h[df_h['added_by'] == staff]) if not df_h.empty else 0
-            s_c = len(df_c[df_c['added_by'] == staff]) if not df_c.empty else 0
+            count_h = len(df_h[df_h['added_by'] == staff]) if not df_h.empty else 0
+            count_c = len(df_c[df_c['added_by'] == staff]) if not df_c.empty else 0
             st.markdown(f"""
             <div class="staff-card">
-                <table style="width:100%; border:none;">
-                    <tr>
-                        <td style="font-size:18px; font-weight:bold;">{staff}</td>
-                        <td style="text-align:right;">🏠 Inventory: <b>{s_h}</b> | 👥 Leads: <b>{s_c}</b></td>
-                    </tr>
-                </table>
+                <b>{staff}</b>: &nbsp;&nbsp; {count_h} Properties &nbsp; | &nbsp; {count_c} Client Leads
             </div>
             """, unsafe_allow_html=True)
 
-    # --- 7. PROPERTY ENTRY ---
-    elif menu == "🏠 Property Inventory":
-        st.markdown("### 🏡 Register Property")
-        with st.container():
-            with st.form("prop_form", clear_on_submit=True):
-                col1, col2 = st.columns(2)
-                with col1:
+    # --- 7. DATA ENTRY (Houses & Clients) ---
+    elif menu == "📥 Data Entry":
+        st.markdown("### 📝 New Registration")
+        tab_h, tab_c = st.tabs(["🏠 Property Entry", "👤 Client Lead"])
+        
+        with tab_h:
+            with st.form("h_form"):
+                col_a, col_b = st.columns(2)
+                with col_a:
                     o_name = st.text_input("Owner Name")
-                    o_contact = st.text_input("Contact Number")
-                    loc = st.text_input("Full Address/Location")
-                with col2:
-                    beds = st.selectbox("Beds", ["1", "2", "3", "4", "5+", "N/A"])
+                    o_contact = st.text_input("Contact")
+                    loc = st.text_input("Location")
+                with col_b:
+                    beds = st.selectbox("Bedrooms", ["1", "2", "3", "4", "5+", "N/A"])
                     rent = st.number_input("Demand Rent", min_value=0)
-                    status = st.selectbox("Current Status", ["Available", "Rent Out"])
-                if st.form_submit_button("Add to Inventory"):
-                    supabase.table('house_inventory').insert({
-                        "owner_name": o_name, "contact": o_contact, "location": loc, 
-                        "beds": beds, "rent": rent, "status": status, "added_by": user_name
-                    }).execute()
-                    st.success("Property Added Successfully!")
+                    status = st.selectbox("Status", ["Available", "Rent Out"])
+                if st.form_submit_button("Submit Property"):
+                    supabase.table('house_inventory').insert({"owner_name": o_name, "contact": o_contact, "location": loc, "beds": beds, "rent": rent, "status": status, "added_by": user_name}).execute()
+                    st.success("Property Saved!")
 
-    # --- 8. CLIENT LEADS ---
-    elif menu == "👤 Client Leads":
-        st.markdown("### 👥 Register Lead")
-        with st.form("lead_form", clear_on_submit=True):
-            lc1, lc2 = st.columns(2)
-            with lc1:
-                c_name = st.text_input("Client Name")
-                c_contact = st.text_input("Contact")
-            with lc2:
-                c_budget = st.number_input("Budget (PKR)", min_value=0)
-                c_loc = st.text_input("Target Location")
-            if st.form_submit_button("Save Lead"):
-                supabase.table('client_leads').insert({
-                    "client_name": c_name, "contact": c_contact, 
-                    "budget": c_budget, "req_location": c_loc, "added_by": user_name
-                }).execute()
-                st.success("Lead Registered!")
+        with tab_c:
+            with st.form("c_form"):
+                cc1, cc2 = st.columns(2)
+                with cc1:
+                    cl_name = st.text_input("Client Name")
+                    cl_contact = st.text_input("Phone")
+                with cc2:
+                    cl_budget = st.number_input("Budget", min_value=0)
+                    cl_loc = st.text_input("Area Preference")
+                if st.form_submit_button("Submit Lead"):
+                    supabase.table('client_leads').insert({"client_name": cl_name, "contact": cl_contact, "budget": cl_budget, "req_location": cl_loc, "added_by": user_name}).execute()
+                    st.success("Lead Recorded!")
 
-    # --- 9. DATABASE HISTORY ---
-    elif menu == "📋 Database History":
-        t1, t2 = st.tabs(["🏠 Property Records", "👥 Client Leads"])
-        with t1:
-            data = supabase.table('house_inventory').select("*").execute()
-            st.dataframe(pd.DataFrame(data.data), use_container_width=True)
-        with t2:
-            data_c = supabase.table('client_leads').select("*").execute()
-            st.dataframe(pd.DataFrame(data_c.data), use_container_width=True)
+    # --- 8. DATABASE HISTORY ---
+    elif menu == "📂 Database History":
+        h_res = supabase.table('house_inventory').select("*").execute()
+        st.markdown("#### 🏠 Full Property List")
+        st.dataframe(pd.DataFrame(h_res.data), use_container_width=True)
 
-    # --- 10. ADMIN CONTROL ---
-    elif menu == "🛠️ Admin Control (Edit/Delete)":
-        st.markdown("### 🛠️ Record Management")
-        target = st.radio("Select Database", ["house_inventory", "client_leads"], horizontal=True)
-        search_id = st.number_input("Search ID", min_value=1, step=1)
-        if st.button("Search Record"):
-            res = supabase.table(target).select("*").eq("id", search_id).execute()
-            if res.data:
-                st.write(res.data[0])
-                if st.button("Confirm Permanent Delete"):
-                    supabase.table(target).delete().eq("id", search_id).execute()
-                    st.error("Record Permanently Removed.")
-                    st.rerun()
-            else: st.error("ID Not Found.")
+    # --- 9. ADMIN TOOLS (Delete by ID) ---
+    elif menu == "🛠️ Admin Tools":
+        st.markdown("### ⚠️ Remove Records")
+        target_db = st.radio("Table", ["house_inventory", "client_leads"], horizontal=True)
+        del_id = st.number_input("Record ID", min_value=1, step=1)
+        if st.button("Delete Record"):
+            supabase.table(target_db).delete().eq("id", del_id).execute()
+            st.error(f"ID {del_id} deleted.")
 
-    # --- 11. REPORT GENERATOR ---
-    elif menu == "🔍 Report Generator":
-        st.markdown("### 🔍 Search & Export")
-        search_term = st.text_input("Filter by Location, Owner, or Status")
-        raw_data = supabase.table('house_inventory').select("*").execute()
-        df_final = pd.DataFrame(raw_data.data)
-        if search_term and not df_final.empty:
-            df_final = df_final[df_final.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)]
-        st.dataframe(df_final, use_container_width=True)
-        if st.button("Export to Professional PDF"):
-            pdf_out = generate_pdf(df_final, "DEEWARY.COM - INVENTORY REPORT")
-            st.download_button("📥 Download Report", pdf_out, "Deewary_Report.pdf")
+    # --- 10. EXPORT REPORTS ---
+    elif menu == "🖨️ Export Reports":
+        st.markdown("### 🔍 Filter & Print")
+        sq = st.text_input("Search Location or Status")
+        raw = supabase.table('house_inventory').select("*").execute()
+        df_r = pd.DataFrame(raw.data)
+        if sq: df_r = df_r[df_r.astype(str).apply(lambda x: x.str.contains(sq, case=False)).any(axis=1)]
+        st.dataframe(df_r, use_container_width=True)
+        if st.button("Generate Professional PDF"):
+            pdf_bytes = generate_pdf(df_r, "DEEWARY PRO INVENTORY")
+            st.download_button("📥 Download PDF", pdf_bytes, "Deewary_Pro_Report.pdf")
 
 else:
-    st.info("👋 Welcome! Please enter your admin code to access the portal.")
+    st.markdown("<h4 style='text-align:center;'>🔒 Unauthorized Access. Please enter the Pin.</h4>", unsafe_allow_html=True)
 
-st.markdown("<br><hr><p style='text-align:center; color:grey;'>© 2026 Deewary.com Portal | System Admin: Anas</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; color:#30363D;'>System Admin: Anas | Version 2.0</p>", unsafe_allow_html=True)
