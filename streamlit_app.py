@@ -9,130 +9,153 @@ key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 # --- 2. PAGE CONFIG ---
-st.set_page_config(page_title="Deewary - Property Portal", layout="wide", page_icon="🏢")
+st.set_page_config(page_title="Deewary | Pakistan's Property Portal", layout="wide", page_icon="🏢")
 
-# --- 3. ZAMEEN STYLE CSS ---
+# --- 3. ZAMEEN.COM THEME CSS ---
 st.markdown("""
     <style>
-    /* Main Background & Font */
-    [data-testid="stAppViewContainer"] { background-color: #f8f9fa; }
+    /* Main Background */
+    [data-testid="stAppViewContainer"] { background-color: #f4f4f4; }
     
-    /* Sidebar Zameen Green Theme */
-    [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #e0e0e0;
-    }
-
-    /* Modern Green Buttons (Zameen Style) */
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #ddd; }
+    
+    /* Zameen Green Buttons */
     div.stButton > button {
         width: 100%;
-        height: 35px !important;
-        background-color: #27a344 !important; /* Zameen Green */
+        height: 38px !important;
+        background-color: #27a344 !important;
         color: white !important;
         border: none !important;
         border-radius: 4px !important;
-        font-size: 13px !important;
         font-weight: 600 !important;
-        margin-bottom: -12px;
         transition: 0.3s;
+        margin-bottom: -10px;
     }
-
-    /* Button Hover */
     div.stButton > button:hover {
         background-color: #1e7e34 !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
     }
 
     /* Sidebar Headers */
-    .section-tag {
-        color: #333333;
+    .nav-header {
         font-size: 11px;
         font-weight: 700;
+        color: #888;
         text-transform: uppercase;
         margin-top: 20px;
         margin-bottom: 5px;
-        letter-spacing: 0.5px;
-        color: #666;
+        letter-spacing: 1px;
     }
 
-    /* Hide Streamlit elements */
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    /* Property Card Style */
+    .prop-card {
+        background-color: white;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        margin-bottom: 15px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.02);
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. NAVIGATION LOGIC ---
-st.sidebar.image("https://www.zameen.com/assets/zameen-logo-en.f94086d7734a7803e7e22f28b3a0e695.svg", width=150) # Just for vibe
-st.sidebar.markdown("<h3 style='color: #27a344; margin-top:-10px;'>Property Admin</h3>", unsafe_allow_html=True)
+# --- 4. NAVIGATION ALGORITHM ---
+# Sidebar Brand
+st.sidebar.markdown("<h1 style='color: #27a344; font-size: 28px; margin-bottom: 0;'>zameen</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='color: #666; font-size: 12px; margin-bottom: 20px;'>Har Pata, Humain Pata Hai</p>", unsafe_allow_html=True)
 
-user_name = st.sidebar.selectbox("User", ["Anas", "Sawer Khan", "Tariq Hussain"])
-pwd = st.sidebar.text_input("Access Code", type="password")
+user_name = st.sidebar.selectbox("Personnel", ["Anas", "Sawer Khan", "Tariq Hussain"])
+access_code = st.sidebar.text_input("Access Code", type="password")
 
-if pwd == "admin786":
+if access_code == "admin786":
+    # Navigation Structure
+    st.sidebar.markdown('<p class="nav-header">MAIN MENU</p>', unsafe_allow_html=True)
+    if st.sidebar.button("🏠 Property Buy/Rent"): st.session_state.menu = "inventory"
+    if st.sidebar.button("👥 Client Leads"): st.session_state.menu = "clients"
     
-    # --- PROPERTIES SECTION ---
-    st.sidebar.markdown('<p class="section-tag">Homes & Plots</p>', unsafe_allow_html=True)
-    c1, c2 = st.sidebar.columns(2)
-    with c1:
-        if st.button("➕ Add New"): st.session_state.page = "add_p"
-    with c2:
-        if st.button("📋 Inventory"): st.session_state.page = "view_p"
+    st.sidebar.markdown('<p class="nav-header">OPERATIONS</p>', unsafe_allow_html=True)
+    if st.sidebar.button("⏳ Pending Tasks"): st.session_state.menu = "tasks"
+    if st.sidebar.button("📍 Site Visits"): st.session_state.menu = "visits"
+    
+    st.sidebar.markdown('<p class="nav-header">ACCOUNTS</p>', unsafe_allow_html=True)
+    if st.sidebar.button("🤝 Done Deals"): st.session_state.menu = "deals"
+    if st.sidebar.button("🔍 Search & Reports"): st.session_state.menu = "reports"
 
-    # --- CLIENTS SECTION ---
-    st.sidebar.markdown('<p class="section-tag">Clients & Leads</p>', unsafe_allow_html=True)
-    c3, c4 = st.sidebar.columns(2)
-    with c3:
-        if st.button("➕ New Lead"): st.session_state.page = "add_c"
-    with c4:
-        if st.button("📋 All Leads"): st.session_state.page = "view_c"
+    # Default View
+    if "menu" not in st.session_state: st.session_state.menu = "inventory"
 
-    # --- OPERATIONS SECTION ---
-    st.sidebar.markdown('<p class="section-tag">Field Operations</p>', unsafe_allow_html=True)
-    c5, c6 = st.sidebar.columns(2)
-    with c5:
-        if st.button("⏳ Tasks"): st.session_state.page = "add_t"
-    with c6:
-        if st.button("📋 Task Log"): st.session_state.page = "view_t"
+    # --- 5. MAIN CONTENT AREA ---
+    active = st.session_state.menu
 
-    c7, c8 = st.sidebar.columns(2)
-    with c7:
-        if st.button("📍 Visits"): st.session_state.page = "add_v"
-    with c8:
-        if st.button("📋 Visit Log"): st.session_state.page = "view_v"
-
-    # --- SUCCESS SECTION ---
-    st.sidebar.markdown('<p class="section-tag">Successful Deals</p>', unsafe_allow_html=True)
-    c9, c10 = st.sidebar.columns(2)
-    with c9:
-        if st.button("🤝 Close Deal"): st.session_state.page = "add_d"
-    with c10:
-        if st.button("📜 Deal History"): st.session_state.page = "view_d"
-
-    # --- REPORTS ---
-    st.sidebar.markdown('<p class="section-tag">Reports Center</p>', unsafe_allow_html=True)
-    if st.sidebar.button("🔎 Search & Export PDF"): st.session_state.page = "report"
-
-    # --- PAGE ROUTING ---
-    if "page" not in st.session_state: st.session_state.page = "view_p"
-    pg = st.session_state.page
-
-    # --- DISPLAY LOGIC ---
-    if pg.startswith("view_"):
-        st.info(f"Viewing {pg.split('_')[1].upper()} Records")
-        # Yahan aapka database fetch ka code aayega
+    # --- INVENTORY ALGORITHM (ZAMEEN STYLE) ---
+    if active == "inventory":
+        col_main, col_form = st.columns([2, 1])
         
-    elif pg == "add_p":
-        st.subheader("🏠 Property Registration")
-        with st.form("prop_form"):
-            st.text_input("Property Title")
-            st.selectbox("City", ["Islamabad", "Rawalpindi", "Lahore"])
-            st.form_submit_button("Submit Property")
+        with col_form:
+            st.markdown("<div class='prop-card'><b>+ Add New Property</b></div>", unsafe_allow_html=True)
+            with st.form("add_prop_form", clear_on_submit=True):
+                title = st.text_input("Property Title")
+                loc = st.text_input("Location (e.g. DHA Phase 2)")
+                p_type = st.selectbox("Type", ["House", "Flat", "Plot", "Commercial"])
+                rent = st.number_input("Demand (PKR)", min_value=0)
+                if st.form_submit_button("List Property"):
+                    supabase.table('house_inventory').insert({"owner_name": title, "location": loc, "portion": p_type, "rent": rent, "added_by": user_name}).execute()
+                    st.success("Listed on Portal!")
+
+        with col_main:
+            st.subheader("Properties in Pakistan")
+            res = supabase.table('house_inventory').select("*").order("id", desc=True).execute()
+            df = pd.DataFrame(res.data)
+            
+            for index, row in df.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div class="prop-card">
+                        <h4 style="color: #27a344; margin-bottom: 5px;">PKR {row['rent']:,}</h4>
+                        <p style="margin: 0;"><b>{row['portion']}</b> in {row['location']}</p>
+                        <p style="font-size: 12px; color: #666;">Added by: {row['added_by']} | ID: #00{row['id']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+    # --- CLIENTS ALGORITHM ---
+    elif active == "clients":
+        st.subheader("Client Requirements & Leads")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            with st.form("client_f"):
+                c_name = st.text_input("Client Name")
+                c_budget = st.number_input("Budget", min_value=0)
+                if st.form_submit_button("Register Lead"):
+                    supabase.table('client_leads').insert({"client_name": c_name, "budget": c_budget, "added_by": user_name}).execute()
+        with c2:
+            res = supabase.table('client_leads').select("*").execute()
+            st.table(pd.DataFrame(res.data))
+
+    # --- TASKS & VISITS (Separated) ---
+    elif active == "tasks":
+        st.subheader("⏳ Daily To-Do List")
+        task = st.text_input("New Task Description")
+        if st.button("Save Task"):
+            supabase.table('pending_tasks').insert({"task": task, "added_by": user_name}).execute()
+        
+        res = supabase.table('pending_tasks').select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+
+    # --- DEALS ALGORITHM ---
+    elif active == "deals":
+        st.subheader("🤝 Closed Deals Record")
+        res = supabase.table('deals_done').select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+
+    # --- REPORTS & SEARCH ---
+    elif active == "reports":
+        st.subheader("🔍 Centralized Search Engine")
+        search_query = st.text_input("Search across database (Price, Location, Name)...")
+        # Logic for filtering data goes here
 
 else:
-    st.sidebar.warning("Please enter the admin code.")
+    st.info("Deewary Property Portal: Please enter your access code in the sidebar to continue.")
 
-# Main Header Design
-st.markdown("""
-    <div style="background-color: #27a344; padding: 10px; border-radius: 5px; text-align: center;">
-        <h2 style="color: white; margin: 0;">DEEWARY PROPERTY MANAGEMENT</h2>
-    </div>
-""", unsafe_allow_html=True)
+# --- FOOTER ---
+st.markdown("<br><hr><p style='text-align: center; color: #888;'>Powered by Deewary.com | Zameen-Inspired CRM v2.0</p>", unsafe_allow_html=True)
