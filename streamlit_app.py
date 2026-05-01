@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-from fpdf import FPDF
 
 # --- 1. SUPABASE SETUP ---
 url = st.secrets["SUPABASE_URL"]
@@ -12,150 +11,173 @@ supabase: Client = create_client(url, key)
 # --- 2. PAGE CONFIG ---
 st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
 
-# Custom CSS for Professional Sidebar and Buttons
+# --- 3. CUSTOM CSS FOR SMALL BUTTONS ---
 st.markdown("""
     <style>
+    /* Sidebar width and spacing */
+    [data-testid="stSidebar"] { min-width: 250px; max-width: 250px; }
+    
+    /* Buttons ko chota aur compact banane ke liye */
+    .stButton>button {
+        width: 100%;
+        height: 32px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        font-size: 14px !important;
+        border-radius: 4px;
+        margin-bottom: -10px;
+        background-color: #2c3e50;
+        color: white;
+    }
+    
+    /* Sidebar Headers */
+    .sidebar-header {
+        color: #FF4B4B;
+        font-weight: bold;
+        font-size: 13px;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        border-bottom: 1px solid #444;
+    }
+    
     #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-    .sidebar-header { color: #FF4B4B; font-weight: bold; font-size: 16px; margin-top: 15px; border-bottom: 1px solid #444; padding-bottom: 5px; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 2.5em; margin-bottom: 5px; }
-    .status-card { background-color: #2c3e50; color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #FF4B4B; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTIONS ---
-def fetch_data(table_name):
-    res = supabase.table(table_name).select("*").order("id", desc=True).execute()
-    return pd.DataFrame(res.data)
-
-def save_data(table_name, data_dict):
+# --- 4. DATA HELPERS ---
+def save_to_supabase(table, data):
     try:
-        supabase.table(table_name).insert(data_dict).execute()
-        st.success(f"✅ Record saved in {table_name.replace('_', ' ').title()}!")
+        supabase.table(table).insert(data).execute()
+        st.success("✅ Data Successfully Saved!")
     except Exception as e:
         st.error(f"Error: {e}")
 
-# --- 4. SIDEBAR NAVIGATION ---
-st.sidebar.title("🏢 DEEWARY ADMIN")
+# --- 5. SIDEBAR LOGIN & NAVIGATION ---
+st.sidebar.markdown("### 🔐 ACCESS CONTROL")
 user_name = st.sidebar.selectbox("Personnel", ["Anas", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
-    # --- NAVIGATION CATEGORIES ---
-    st.sidebar.markdown('<p class="sidebar-header">🏠 PROPERTIES</p>', unsafe_allow_html=True)
-    if st.sidebar.button("➕ Register New Property"): st.session_state.page = "reg_prop"
-    if st.sidebar.button("📋 View All Properties"): st.session_state.page = "view_prop"
+    
+    # --- SECTION: PROPERTIES ---
+    st.sidebar.markdown('<p class="sidebar-header">🏠 Properties</p>', unsafe_allow_html=True)
+    if st.sidebar.button("➕ Register Property"): st.session_state.page = "reg_prop"
+    if st.sidebar.button("📋 Property History"): st.session_state.page = "hist_prop"
 
-    st.sidebar.markdown('<p class="sidebar-header">👥 CLIENTS</p>', unsafe_allow_html=True)
-    if st.sidebar.button("➕ Register New Client"): st.session_state.page = "reg_client"
-    if st.sidebar.button("📋 View Client Leads"): st.session_state.page = "view_client"
+    # --- SECTION: CLIENTS ---
+    st.sidebar.markdown('<p class="sidebar-header">👥 Clients</p>', unsafe_allow_html=True)
+    if st.sidebar.button("➕ Register Client"): st.session_state.page = "reg_client"
+    if st.sidebar.button("📋 Client History"): st.session_state.page = "hist_client"
 
-    st.sidebar.markdown('<p class="sidebar-header">⏳ TASKS & VISITS</p>', unsafe_allow_html=True)
-    if st.sidebar.button("➕ Add Pending Task"): st.session_state.page = "reg_task"
-    if st.sidebar.button("📋 Pending Task List"): st.session_state.page = "view_task"
-    if st.sidebar.button("➕ Log Site Visit"): st.session_state.page = "reg_visit"
-    if st.sidebar.button("📋 Site Visit History"): st.session_state.page = "view_visit"
+    # --- SECTION: TASKS ---
+    st.sidebar.markdown('<p class="sidebar-header">⏳ Pending Tasks</p>', unsafe_allow_html=True)
+    if st.sidebar.button("➕ Add New Task"): st.session_state.page = "reg_task"
+    if st.sidebar.button("📋 Task History"): st.session_state.page = "hist_task"
 
-    st.sidebar.markdown('<p class="sidebar-header">🤝 DEALS</p>', unsafe_allow_html=True)
+    # --- SECTION: SITE VISITS ---
+    st.sidebar.markdown('<p class="sidebar-header">📍 Site Visits</p>', unsafe_allow_html=True)
+    if st.sidebar.button("➕ Log New Visit"): st.session_state.page = "reg_visit"
+    if st.sidebar.button("📋 Visit History"): st.session_state.page = "hist_visit"
+
+    # --- SECTION: DEALS ---
+    st.sidebar.markdown('<p class="sidebar-header">🤝 Deals Done</p>', unsafe_allow_html=True)
     if st.sidebar.button("🏆 Record Done Deal"): st.session_state.page = "reg_deal"
-    if st.sidebar.button("📋 Closed Deals History"): st.session_state.page = "view_deal"
+    if st.sidebar.button("📋 Deal History"): st.session_state.page = "hist_deal"
 
-    st.sidebar.markdown('<p class="sidebar-header">🔍 REPORTS</p>', unsafe_allow_html=True)
-    if st.sidebar.button("🖨️ Search & Export PDF"): st.session_state.page = "search_pdf"
+    # --- SECTION: REPORTS ---
+    st.sidebar.markdown('<p class="sidebar-header">🔍 Reports</p>', unsafe_allow_html=True)
+    if st.sidebar.button("🖨️ Search & PDF"): st.session_state.page = "search_report"
 
     # Default Page
-    if "page" not in st.session_state: st.session_state.page = "view_prop"
+    if "page" not in st.session_state: st.session_state.page = "hist_prop"
 
-    # --- 5. PAGE LOGIC ---
-    current_page = st.session_state.page
+    # --- 6. PAGE ROUTING ---
+    pg = st.session_state.page
 
-    # --- REGISTRATION FORMS ---
-    if current_page == "reg_prop":
-        st.subheader("🏠 New Property Registration")
-        with st.form("prop_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                o_name = st.text_input("Owner Name")
-                loc = st.text_input("Location/Address")
-                p_type = st.selectbox("Type", ["House", "Flat", "Shop", "Office", "Plot"])
-            with c2:
-                rent = st.number_input("Demand (PKR)", min_value=0)
-                size = st.text_input("Size (e.g. 5 Marla)")
-                contact = st.text_input("Contact Number")
+    # 1. PROPERTY PAGES
+    if pg == "reg_prop":
+        st.subheader("🏡 Register New Property")
+        with st.form("p_form", clear_on_submit=True):
+            o_name = st.text_input("Owner Name")
+            loc = st.text_input("Address")
+            rent = st.number_input("Demand", min_value=0)
             if st.form_submit_button("Save Property"):
-                save_data('house_inventory', {"owner_name": o_name, "location": loc, "portion": p_type, "rent": rent, "size": size, "contact": contact, "added_by": user_name})
+                save_to_supabase("house_inventory", {"owner_name": o_name, "location": loc, "rent": rent, "added_by": user_name})
+    
+    elif pg == "hist_prop":
+        st.subheader("📋 Property Records")
+        res = supabase.table("house_inventory").select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    elif current_page == "reg_client":
-        st.subheader("👥 New Client Requirement")
-        with st.form("client_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                c_name = st.text_input("Client Name")
-                c_req = st.text_input("Required Area")
-            with c2:
-                budget = st.number_input("Budget (PKR)", min_value=0)
-                contact = st.text_input("Client Contact")
+    # 2. CLIENT PAGES
+    elif pg == "reg_client":
+        st.subheader("👥 Register New Client")
+        with st.form("c_form", clear_on_submit=True):
+            c_name = st.text_input("Client Name")
+            budget = st.number_input("Budget", min_value=0)
             if st.form_submit_button("Save Client"):
-                save_data('client_leads', {"client_name": c_name, "req_location": c_req, "budget": budget, "contact": contact, "added_by": user_name})
+                save_to_supabase("client_leads", {"client_name": c_name, "budget": budget, "added_by": user_name})
+    
+    elif pg == "hist_client":
+        st.subheader("📋 Client Records")
+        res = supabase.table("client_leads").select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    elif current_page == "reg_task":
-        st.subheader("⏳ Add Pending Task")
-        with st.form("task_form"):
+    # 3. TASK PAGES
+    elif pg == "reg_task":
+        st.subheader("⏳ Add New Pending Task")
+        with st.form("t_form", clear_on_submit=True):
             task = st.text_area("Task Detail")
-            priority = st.selectbox("Priority", ["Low", "Medium", "High"])
             if st.form_submit_button("Save Task"):
-                save_data('pending_tasks', {"task": task, "priority": priority, "status": "Pending", "added_by": user_name})
+                save_to_supabase("pending_tasks", {"task": task, "status": "Pending", "added_by": user_name})
+    
+    elif pg == "hist_task":
+        st.subheader("📋 Pending Task Records")
+        res = supabase.table("pending_tasks").select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    elif current_page == "reg_visit":
-        st.subheader("📍 Log Site Visit")
-        with st.form("visit_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                v_client = st.text_input("Client Name")
-                v_prop = st.text_input("Property Visited")
-            with c2:
-                v_date = st.date_input("Visit Date")
-                outcome = st.selectbox("Outcome", ["Interested", "Thinking", "Rejected"])
-            if st.form_submit_button("Log Visit"):
-                save_data('site_visits', {"client_name": v_client, "property_details": v_prop, "visit_date": str(v_date), "outcome": outcome, "agent": user_name})
+    # 4. VISIT PAGES
+    elif pg == "reg_visit":
+        st.subheader("📍 Log New Site Visit")
+        with st.form("v_form", clear_on_submit=True):
+            v_client = st.text_input("Client Name")
+            v_prop = st.text_input("Property Visited")
+            if st.form_submit_button("Save Visit"):
+                save_to_supabase("site_visits", {"client_name": v_client, "property_details": v_prop, "agent": user_name})
+    
+    elif pg == "hist_visit":
+        st.subheader("📋 Site Visit Records")
+        res = supabase.table("site_visits").select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    elif current_page == "reg_deal":
+    # 5. DEAL PAGES
+    elif pg == "reg_deal":
         st.subheader("🏆 Record Done Deal")
-        with st.form("deal_form"):
-            c1, c2 = st.columns(2)
-            with c1:
-                prop = st.text_input("Property Address")
-                client = st.text_input("Client Name")
-                f_rent = st.number_input("Final Rent", min_value=0)
-            with c2:
-                comm = st.number_input("Commission Earned", min_value=0)
-                d_date = st.date_input("Closing Date")
-            if st.form_submit_button("🏆 SAVE DEAL"):
-                save_data('deals_done', {"property": prop, "client": client, "rent": f_rent, "commission": comm, "closing_date": str(d_date), "closed_by": user_name})
+        with st.form("d_form", clear_on_submit=True):
+            d_prop = st.text_input("Property Address")
+            d_rent = st.number_input("Final Rent", min_value=0)
+            if st.form_submit_button("Save Done Deal"):
+                save_to_supabase("deals_done", {"property": d_prop, "rent": d_rent, "closed_by": user_name})
+    
+    elif pg == "hist_deal":
+        st.subheader("📋 Successful Deal Records")
+        res = supabase.table("deals_done").select("*").execute()
+        st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    # --- VIEW RECORDS PAGES ---
-    elif current_page.startswith("view_"):
-        table_map = {
-            "view_prop": "house_inventory",
-            "view_client": "client_leads",
-            "view_task": "pending_tasks",
-            "view_visit": "site_visits",
-            "view_deal": "deals_done"
-        }
-        target_table = table_map[current_page]
-        st.subheader(f"📋 {target_table.replace('_', ' ').upper()} RECORDS")
-        df = fetch_data(target_table)
-        st.dataframe(df, use_container_width=True)
-
-    # --- SEARCH & PDF PAGE ---
-    elif current_page == "search_pdf":
-        st.subheader("🔍 Universal Search & PDF Report")
-        mode = st.selectbox("Select Category", ["house_inventory", "client_leads", "pending_tasks", "site_visits", "deals_done"])
-        q = st.text_input("Search Anything...")
-        df = fetch_data(mode)
+    # 6. SEARCH & PDF
+    elif pg == "search_report":
+        st.subheader("🔍 Universal Search & Report")
+        mode = st.selectbox("Select Record Type", ["house_inventory", "client_leads", "pending_tasks", "site_visits", "deals_done"])
+        q = st.text_input("Type to search...")
+        res = supabase.table(mode).select("*").execute()
+        df = pd.DataFrame(res.data)
         if q:
             df = df[df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
         st.dataframe(df, use_container_width=True)
-        # PDF generation logic (same as your original code) goes here
 
 else:
-    st.info("Please enter Access Code in Sidebar to manage Deewary Database.")
+    st.warning("Please enter correct access code to view the menu.")
+
+st.divider()
+st.caption(f"© {datetime.now().year} Deewary.com | Data Protection Active")
