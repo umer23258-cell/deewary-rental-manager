@@ -13,46 +13,44 @@ supabase: Client = create_client(url, key)
 # --- 2. PAGE CONFIG ---
 st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
 
-# Modern Styling for Buttons and UI
+# Custom CSS for Professional Look
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Professional Button Styling */
-    .stButton>button {
-        background-color: #2c3e50;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 10px 20px;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #34495e;
-        border: 1px solid #FF4B4B;
+    /* Sidebar Section Headers */
+    .sidebar-header {
         color: #FF4B4B;
+        font-weight: bold;
+        font-size: 18px;
+        margin-top: 20px;
+        border-bottom: 1px solid #444;
     }
     
-    /* Input field focus color */
-    .stTextInput>div>div>input:focus {
-        border-color: #2c3e50;
+    /* Button Styling */
+    .stButton>button {
+        width: 100%;
+        background-color: #2c3e50;
+        color: white;
+        border-radius: 5px;
+    }
+    .stButton>button:hover {
+        border-color: #FF4B4B;
+        color: #FF4B4B;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. PROFESSIONAL TABLE PDF FUNCTION ---
+# --- 3. PDF FUNCTION ---
 def generate_pdf(df, title):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
     pdf.set_font("Helvetica", 'B', 16)
     pdf.cell(0, 10, txt=title, ln=True, align='C')
     pdf.ln(5)
-    
-    # Table Header
     pdf.set_font("Helvetica", 'B', 10)
     pdf.set_fill_color(200, 200, 200)
     
-    # Column Widths (Total ~277mm for A4 Landscape)
     col_width = [15, 40, 60, 25, 25, 30, 30, 52]
     headers = ["ID", "Owner/Client", "Location", "Type", "Beds", "Rent/Budget", "Size", "Status/Job"]
     
@@ -60,187 +58,150 @@ def generate_pdf(df, title):
         pdf.cell(col_width[i], 10, headers[i], 1, 0, 'C', 1)
     pdf.ln()
     
-    # Table Body
     pdf.set_font("Helvetica", size=9)
     for index, row in df.iterrows():
-        # Data mapping
-        id_val = str(row.get('id', ''))
-        name = str(row.get('owner_name', row.get('client_name', '')))[:18]
-        loc = str(row.get('location', row.get('req_location', '')))[:25]
-        portion = str(row.get('portion', row.get('req_portion', '')))
-        beds = str(row.get('beds', row.get('beds_required', '')))
-        money = str(row.get('rent', row.get('budget', '')))
-        size = str(row.get('size', row.get('marla', '')))
-        extra = str(row.get('status', row.get('job', '')))[:25]
-
-        vals = [id_val, name, loc, portion, beds, money, size, extra]
-        
+        vals = [
+            str(row.get('id', '')),
+            str(row.get('owner_name', row.get('client_name', '')))[:18],
+            str(row.get('location', row.get('req_location', '')))[:25],
+            str(row.get('portion', row.get('req_portion', ''))),
+            str(row.get('beds', row.get('beds_required', ''))),
+            str(row.get('rent', row.get('budget', ''))),
+            str(row.get('size', row.get('marla', ''))),
+            str(row.get('status', row.get('job', '')))[:25]
+        ]
         for i in range(len(vals)):
-            # Encoding fix for special characters
             clean_text = vals[i].encode('latin-1', 'ignore').decode('latin-1')
             pdf.cell(col_width[i], 10, clean_text, 1)
         pdf.ln()
-        
     return pdf.output(dest='S')
 
 # --- 4. HEADER ---
 st.markdown("""
-    <div style="text-align: center; background-color: #2c3e50; padding: 20px; border-radius: 15px; border-bottom: 5px solid #FF4B4B;">
-        <h1 style="color: white; margin: 0; font-family: 'Arial';">DEEWARY PROPERTY MANAGER</h1>
-        <p style="color: #bdc3c7; letter-spacing: 2px;">OWNER INVENTORY & CLIENT DATABASE</p>
+    <div style="text-align: center; background-color: #2c3e50; padding: 20px; border-radius: 15px;">
+        <h1 style="color: white; margin: 0;">DEEWARY PROPERTY MANAGER</h1>
+        <p style="color: #FF4B4B; font-weight: bold;">OFFICIAL DATABASE SYSTEM</p>
     </div>
 """, unsafe_allow_html=True)
 
-# --- 5. STAFF LOGIN ---
-st.sidebar.title("🔐 Staff Access")
-user_name = st.sidebar.selectbox("Select User", ["Anas", "Sawer Khan", "Tariq Hussain"])
+# --- 5. SIDEBAR LOGIN & SECTIONS ---
+st.sidebar.title("🔐 Access Control")
+user_name = st.sidebar.selectbox("Personnel", ["Anas", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
-    menu = st.sidebar.radio("MENU", [
-        "🏠 Property Registration", 
-        "👤 Client Entry", 
-        "📋 View Records",
-        "🛠️ Manage Records",
-        "🔍 Search & Export"
-    ])
+    
+    # --- ALAG ALAG BUTTON SECTIONS ---
+    st.sidebar.markdown('<p class="sidebar-header">📥 DATA ENTRY</p>', unsafe_allow_html=True)
+    if st.sidebar.button("🏠 Register Property"):
+        st.session_state.menu = "property_entry"
+    if st.sidebar.button("👤 Register Client"):
+        st.session_state.menu = "client_entry"
+        
+    st.sidebar.markdown('<p class="sidebar-header">📊 RECORDS & REPORTS</p>', unsafe_allow_html=True)
+    if st.sidebar.button("📋 View Full History"):
+        st.session_state.menu = "history"
+    if st.sidebar.button("🛠️ Edit/Delete Records"):
+        st.session_state.menu = "manage"
+    if st.sidebar.button("🔍 Search & Print PDF"):
+        st.session_state.menu = "search"
 
-    # --- 6. GHAR KI ENTRY ---
-    if menu == "🏠 Property Registration":
-        st.subheader("🏡 Register New Property (Owner)")
-        with st.form("house_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
+    # Default view
+    if "menu" not in st.session_state:
+        st.session_state.menu = "history"
+
+    # --- 6. PROPERTY ENTRY ---
+    if st.session_state.menu == "property_entry":
+        st.subheader("🏡 New Property Registration")
+        with st.form("h_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
                 o_name = st.text_input("Owner Name")
-                o_contact = st.text_input("Contact Number")
-                loc = st.text_input("Location / Address")
-                portion = st.selectbox("Portion", ["Full House", "Ground Floor", "First Floor", "Basement", "Shop", "Office"])
-            with col2:
-                beds = st.selectbox("Bedrooms", ["1", "2", "3", "4", "5", "6+", "N/A"])
-                rent = st.number_input("Demand Rent (PKR)", min_value=0)
+                o_contact = st.text_input("Contact")
+                loc = st.text_input("Address")
+                portion = st.selectbox("Type", ["Full House", "Ground Floor", "First Floor", "Basement", "Shop", "Office"])
+            with c2:
+                beds = st.selectbox("Beds", ["1", "2", "3", "4", "5", "6+", "N/A"])
+                rent = st.number_input("Demand (PKR)", min_value=0)
                 size = st.text_input("Size (Marla/Kanal)")
                 status = st.selectbox("Status", ["Available", "Rent Out"])
             
-            other = st.text_area("Other Details")
-            if st.form_submit_button("Save House Record"):
-                payload = {
+            if st.form_submit_button("Save Property"):
+                supabase.table('house_inventory').insert({
                     "owner_name": o_name, "contact": o_contact, "location": loc, 
-                    "portion": portion, "beds": beds, "rent": rent, 
-                    "size": size, "status": status, "details": other, "added_by": user_name
-                }
-                supabase.table('house_inventory').insert(payload).execute()
-                st.success("House Record Saved Successfully!")
+                    "portion": portion, "beds": beds, "rent": rent, "size": size, 
+                    "status": status, "added_by": user_name
+                }).execute()
+                st.success("Property Saved!")
 
-    # --- 7. CLIENT KI ENTRY ---
-    elif menu == "👤 Client Entry":
-        st.subheader("👨‍👩‍👧‍👦 Register Client Requirement")
-        with st.form("client_form", clear_on_submit=True):
-            c_col1, c_col2 = st.columns(2)
-            with c_col1:
+    # --- 7. CLIENT ENTRY ---
+    elif st.session_state.menu == "client_entry":
+        st.subheader("👨‍👩‍👧‍👦 New Client Requirement")
+        with st.form("c_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
                 c_name = st.text_input("Client Name")
-                c_contact = st.text_input("Client Contact")
-                c_loc = st.text_input("Required Location")
-                c_job = st.text_input("Job/Business")
-            with c_col2:
-                c_budget = st.number_input("Monthly Budget (PKR)", min_value=0)
-                c_portion = st.selectbox("Requirement", ["Full House", "Portion", "Flat", "Shop", "Office"])
-                c_beds = st.selectbox("Required Beds", ["1", "2", "3", "4", "5", "6+", "Any"])
-                c_marla = st.text_input("Required Size")
-            
-            c_family = st.text_input("Family Members")
-            c_req = st.text_area("Extra Requirements")
+                c_contact = st.text_input("Contact")
+                c_loc = st.text_input("Required Area")
+            with c2:
+                c_budget = st.number_input("Budget (PKR)", min_value=0)
+                c_portion = st.selectbox("Type Required", ["Full House", "Portion", "Flat", "Shop", "Office"])
+                c_marla = st.text_input("Marla Required")
             
             if st.form_submit_button("Save Client Lead"):
-                payload = {
+                supabase.table('client_leads').insert({
                     "client_name": c_name, "contact": c_contact, "req_location": c_loc, 
-                    "budget": c_budget, "req_portion": c_portion, "family": c_family, 
-                    "job": c_job, "beds_required": c_beds, "marla": c_marla, 
-                    "requirements": c_req, "added_by": user_name
-                }
-                supabase.table('client_leads').insert(payload).execute()
-                st.success("Client Lead Saved Successfully!")
+                    "budget": c_budget, "req_portion": c_portion, "marla": c_marla, "added_by": user_name
+                }).execute()
+                st.success("Client Saved!")
 
-    # --- 8. FULL HISTORY ---
-    elif menu == "📋 View Records":
-        st.subheader("📋 Registered Data History")
-        tab1, tab2 = st.tabs(["🏠 House Inventory", "👥 Client Leads"])
-        with tab1:
-            res_h = supabase.table('house_inventory').select("*").execute()
-            if res_h.data:
-                st.dataframe(pd.DataFrame(res_h.data), use_container_width=True)
-            else: st.write("No House Records.")
-        with tab2:
-            res_c = supabase.table('client_leads').select("*").execute()
-            if res_c.data:
-                st.dataframe(pd.DataFrame(res_c.data), use_container_width=True)
-            else: st.write("No Client Leads.")
+    # --- 8. HISTORY ---
+    elif st.session_state.menu == "history":
+        st.subheader("📋 System Database")
+        t1, t2 = st.tabs(["🏠 Properties", "👥 Clients"])
+        with t1:
+            res = supabase.table('house_inventory').select("*").execute()
+            st.dataframe(pd.DataFrame(res.data), use_container_width=True)
+        with t2:
+            res = supabase.table('client_leads').select("*").execute()
+            st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
-    # --- 9. MANAGE RECORDS ---
-    elif menu == "🛠️ Manage Records":
-        st.subheader("🛠️ Search by ID to Edit or Delete")
-        target_table = st.radio("Select Table", ["house_inventory", "client_leads"], horizontal=True)
-        search_id = st.number_input("Enter ID Number", min_value=1, step=1)
-        
+    # --- 9. MANAGE ---
+    elif st.session_state.menu == "manage":
+        st.subheader("🛠️ Edit or Delete Records")
+        tbl = st.radio("Select Table", ["house_inventory", "client_leads"], horizontal=True)
+        sid = st.number_input("Enter ID", min_value=1, step=1)
         if st.button("Find Record"):
-            res = supabase.table(target_table).select("*").eq("id", search_id).execute()
-            if res.data:
-                st.session_state.found_record = res.data[0]
-                st.session_state.target_table = target_table
-                st.session_state.search_id = search_id
-            else:
-                st.session_state.found_record = None
-                st.error("No record found with this ID.")
-
-        if "found_record" in st.session_state and st.session_state.found_record:
-            record = st.session_state.found_record
-            st.info(f"Modifying ID: {st.session_state.search_id}")
-            st.write(record)
-            
-            if st.session_state.target_table == "house_inventory":
-                new_st = st.selectbox("Update Status", ["Available", "Rent Out"], 
-                                     index=0 if record.get('status') == 'Available' else 1)
-                if st.button("Confirm Update"):
-                    supabase.table(st.session_state.target_table).update({"status": new_st}).eq("id", st.session_state.search_id).execute()
-                    st.success("Status Updated!")
-                    del st.session_state.found_record
-            
-            st.divider()
-            if st.button("🗑️ Delete Record Permanently"):
-                supabase.table(st.session_state.target_table).delete().eq("id", st.session_state.search_id).execute()
-                st.warning(f"Record {st.session_state.search_id} deleted.")
-                del st.session_state.found_record
-
-    # --- 10. SEARCH & PRINT PDF ---
-    elif menu == "🔍 Search & Export":
-        st.subheader("🔍 Master Search & Export PDF")
-        report_type = st.radio("Select Data Source", ["Houses", "Clients"])
-        search_q = st.text_input("Filter Data (Type anything...)")
+            res = supabase.table(tbl).select("*").eq("id", sid).execute()
+            if res.data: st.session_state.found = res.data[0]
+            else: st.error("Not Found")
         
-        table_name = 'house_inventory' if report_type == "Houses" else 'client_leads'
-        res = supabase.table(table_name).select("*").execute()
-        
+        if "found" in st.session_state:
+            st.write(st.session_state.found)
+            if st.button("🗑️ Delete Permanently"):
+                supabase.table(tbl).delete().eq("id", sid).execute()
+                st.warning("Deleted!")
+                del st.session_state.found
+
+    # --- 10. SEARCH & PDF ---
+    elif st.session_state.menu == "search":
+        st.subheader("🔍 Search & Download Report")
+        mode = st.radio("Report For", ["Houses", "Clients"])
+        q = st.text_input("Search Anything...")
+        tbl_name = 'house_inventory' if mode == "Houses" else 'client_leads'
+        res = supabase.table(tbl_name).select("*").execute()
         if res.data:
-            df_all = pd.DataFrame(res.data)
-            if search_q:
-                df_all = df_all[df_all.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-            
-            st.dataframe(df_all, use_container_width=True)
-            
-            if not df_all.empty:
-                if st.button("Generate Professional PDF"):
-                    pdf_bytes = generate_pdf(df_all, f"DEEWARY {report_type.upper()} REPORT")
-                    st.download_button(
-                        label="📥 Download PDF Report",
-                        data=pdf_bytes,
-                        file_name=f"Deewary_{report_type}_{datetime.now().strftime('%d-%m-%y')}.pdf",
-                        mime="application/pdf"
-                    )
-        else:
-            st.warning("No data available.")
+            df = pd.DataFrame(res.data)
+            if q:
+                df = df[df.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
+            st.dataframe(df, use_container_width=True)
+            if st.button("Download Professional PDF"):
+                pdf_bytes = generate_pdf(df, f"DEEWARY {mode.upper()} REPORT")
+                st.download_button("📥 Click to Download", pdf_bytes, "Report.pdf", "application/pdf")
 
 else:
     if pwd != "":
-        st.error("Please enter correct access code.")
+        st.error("Access Denied")
 
 st.divider()
-st.caption(f"© {datetime.now().year} Deewary.com | Professional System Active")
+st.caption(f"© {datetime.now().year} Deewary.com | Data Protection Active")
