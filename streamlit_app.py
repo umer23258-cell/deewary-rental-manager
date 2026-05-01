@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-import plotly.express as px  # Dashboard graphs ke liye
+import plotly.express as px
 from fpdf import FPDF
 import io
 
@@ -17,19 +17,18 @@ st.set_page_config(page_title="Deewary CRM", layout="wide", page_icon="🏢")
 # Hide Streamlit UI
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-# --- 3. DATA FETCHING HELPERS ---
+# --- 3. DATA HELPERS ---
 def get_data(table):
     try:
         res = supabase.table(table).select("*").execute()
         return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-    except Exception:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 # --- 4. HEADER ---
 st.markdown("""
     <div style="text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 15px; border: 2px solid #FF4B4B;">
         <h1 style="color: #FF4B4B; margin: 0; font-family: 'Arial Black';">DEEWARY PROPERTY MANAGER</h1>
-        <p style="color: white; letter-spacing: 2px;">STAFF PROGRESS & DEALS TRACKING</p>
+        <p style="color: white; letter-spacing: 2px;">STAFF PANEL: ENTRIES & HISTORY</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -39,146 +38,103 @@ user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Anas", "Sawer Khan"
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
-    menu = st.sidebar.radio("KAAM SELECT KAREN", [
-        "📊 Dashboard (Daily Progress)",
-        "🏠 Ghar ki Entry (Owners)", 
-        "👤 Client ki Entry (Tenants)", 
-        "🤝 Deals (Pending/Done)",
-        "📋 Full History (View Only)"
+    # Sidebar ko do hisson mein taqseem kiya hai
+    st.sidebar.markdown("### 📝 DATA ENTRY")
+    entry_menu = st.sidebar.radio("Nayi Entry Karen:", [
+        "🏠 Ghar ki Entry", 
+        "👤 Client ki Entry", 
+        "🤝 Deal Close Karen"
     ])
 
-    # --- 6. DASHBOARD (DAILY PROGRESS) ---
-    if menu == "📊 Dashboard (Daily Progress)":
-        st.subheader(f"📅 Daily Progress Report - {datetime.now().strftime('%d %b %Y')}")
-        
-        # Fetching all data
-        df_h = get_data('house_inventory')
-        df_d = get_data('deals') # Ensure 'deals' table is in Supabase
-        
-        # Metrics Row
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Properties", len(df_h))
-        m2.metric("Total Deals", len(df_d))
-        m3.metric("Pending Deals", len(df_d[df_d['deal_status'] == 'Pending']) if not df_d.empty else 0)
-        m4.metric("Closed Deals", len(df_d[df_d['deal_status'] == 'Done']) if not df_d.empty else 0)
+    st.sidebar.divider()
+    
+    st.sidebar.markdown("### 📜 RECORDS & PROGRESS")
+    history_menu = st.sidebar.radio("History Dekhen:", [
+        "📊 Daily Dashboard",
+        "📋 Full Inventory History",
+        "⏳ Pending Deals List",
+        "✅ Done Deals History"
+    ])
 
-        st.divider()
-        col_left, col_right = st.columns(2)
-        
-        with col_left:
-            if not df_h.empty:
-                st.write("### 👨‍💻 Staff Wise Activity (House Entries)")
-                fig = px.bar(df_h, x='added_by', title="Total Entries per Person", color='added_by', template="plotly_dark")
-                st.plotly_chart(fig, use_container_width=True)
-        
-        with col_right:
-            if not df_d.empty:
-                st.write("### 💹 Deals Success Ratio")
-                fig2 = px.pie(df_d, names='deal_status', title="Pending vs Done", hole=0.4)
-                st.plotly_chart(fig2, use_container_width=True)
-
-    # --- 7. DEALS (PENDING / DONE) ---
-    elif menu == "🤝 Deals (Pending/Done)":
-        st.subheader("🤝 Nayi Deal ki Entry Karen")
-        
-        with st.form("deals_form", clear_on_submit=True):
-            d1, d2 = st.columns(2)
-            with d1:
-                client_n = st.text_input("Client ka Naam")
-                property_id = st.text_input("House ID / Reference")
-                deal_type = st.selectbox("Deal ki Qisam", ["Rent", "Sale", "Token"])
-            with d2:
-                deal_amt = st.number_input("Final Amount (PKR)", min_value=0)
-                deal_st = st.selectbox("Status", ["Pending", "Done"])
-                deal_date = str(datetime.now().date())
-            
-            if st.form_submit_button("Save Deal Record"):
-                payload = {
-                    "client_name": client_n, "house_id": property_id, "deal_type": deal_type,
-                    "amount": deal_amt, "deal_status": deal_st, "deal_date": deal_date, "staff_name": user_name
-                }
-                supabase.table('deals').insert(payload).execute()
-                st.success(f"Deal ({deal_st}) record save ho gaya!")
-
-        st.divider()
-        st.write("### 🛠️ Deal Update Karen (Pending to Done)")
-        pending_deals = get_data('deals')
-        if not pending_deals.empty:
-            pending_list = pending_deals[pending_deals['deal_status'] == 'Pending']
-            if not pending_list.empty:
-                deal_to_update = st.selectbox("Select Pending Deal to Mark Done", pending_list['id'])
-                if st.button("Mark as DONE ✅"):
-                    supabase.table('deals').update({"deal_status": "Done"}).eq("id", deal_to_update).execute()
-                    st.success("Deal Mukammal (Done) ho gayi!")
-            else:
-                st.info("Koi Pending deal nahi hai.")
-
-    # --- 8. ORIGINAL ENTRIES SECTIONS ---
-    elif menu == "🏠 Ghar ki Entry (Owners)":
-        st.subheader("🏡 Naye Ghar ya Shop ki Detail Darj Karen")
-        with st.form("house_form", clear_on_submit=True):
+    # --- 6. DATA ENTRY LOGIC ---
+    if entry_menu == "🏠 Ghar ki Entry":
+        st.subheader("🏡 Naye Ghar ya Shop ki Detail")
+        with st.form("h_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                o_name = st.text_input("Owner ka Naam")
-                o_contact = st.text_input("Owner ka Contact Number")
-                loc = st.text_input("Location / Address")
-                portion = st.selectbox("Portion", ["Full House", "Ground Floor", "First Floor", "Basement", "Shop", "Office"])
+                o_name = st.text_input("Owner Name")
+                loc = st.text_input("Location")
             with col2:
-                beds = st.selectbox("Bedrooms (Beds)", ["1", "2", "3", "4", "5", "6+", "N/A"])
-                rent = st.number_input("Demand Rent (PKR)", min_value=0)
-                size = st.text_input("Size (Marla/Kanal)")
+                rent = st.number_input("Demand Rent", min_value=0)
                 status = st.selectbox("Status", ["Available", "Rent Out"])
-            
-            other = st.text_area("Other Details")
-            if st.form_submit_button("Save House Record"):
-                payload = {
-                    "owner_name": o_name, "contact": o_contact, "location": loc, 
-                    "portion": portion, "beds": beds, "rent": rent, 
-                    "size": size, "status": status, "details": other, "added_by": user_name
-                }
-                supabase.table('house_inventory').insert(payload).execute()
-                st.success("House Record Saved!")
+            if st.form_submit_button("Save Property"):
+                supabase.table('house_inventory').insert({"owner_name": o_name, "location": loc, "rent": rent, "status": status, "added_by": user_name}).execute()
+                st.success("Ghar ka record save ho gaya!")
 
-    elif menu == "👤 Client ki Entry (Tenants)":
-        st.subheader("👨‍👩‍👧‍👦 Client Requirement Register Karen")
-        with st.form("client_form", clear_on_submit=True):
-            c_col1, c_col2 = st.columns(2)
-            with c_col1:
-                c_name = st.text_input("Client ka Naam")
-                c_contact = st.text_input("Client Contact")
-                c_loc = st.text_input("Required Location")
-            with c_col2:
-                c_budget = st.number_input("Monthly Budget (PKR)", min_value=0)
-                c_portion = st.selectbox("Requirement", ["Full House", "Portion", "Flat", "Shop", "Office"])
-                c_marla = st.text_input("Required Size")
-            
-            if st.form_submit_button("Save Client Lead"):
-                payload = {
-                    "client_name": c_name, "contact": c_contact, "req_location": c_loc, 
-                    "budget": c_budget, "req_portion": c_portion, "marla": c_marla, "added_by": user_name
-                }
-                supabase.table('client_leads').insert(payload).execute()
-                st.success("Client Lead Saved!")
+    elif entry_menu == "👤 Client ki Entry":
+        st.subheader("👤 Client Requirement Darj Karen")
+        with st.form("c_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                c_name = st.text_input("Client Name")
+                req = st.text_input("Required Location")
+            with col2:
+                budget = st.number_input("Budget", min_value=0)
+            if st.form_submit_button("Save Client"):
+                supabase.table('client_leads').insert({"client_name": c_name, "req_location": req, "budget": budget, "added_by": user_name}).execute()
+                st.success("Client ki requirement save ho gayi!")
 
-    # --- 9. FULL HISTORY ---
-    elif menu == "📋 Full History (View Only)":
-        tab1, tab2, tab3 = st.tabs(["🏠 House Inventory", "👥 Client Leads", "🤝 Deals History"])
+    elif entry_menu == "🤝 Deal Close Karen":
+        st.subheader("🤝 Nayi Deal (Pending ya Done) darj karen")
+        with st.form("d_form", clear_on_submit=True):
+            d1, d2 = st.columns(2)
+            with d1:
+                cl_name = st.text_input("Client for Deal")
+                h_id = st.text_input("House ID / Ref")
+            with d2:
+                d_status = st.selectbox("Deal Status", ["Pending", "Done"])
+                d_amt = st.number_input("Amount", min_value=0)
+            if st.form_submit_button("Submit Deal"):
+                supabase.table('deals').insert({"client_name": cl_name, "house_id": h_id, "deal_status": d_status, "amount": d_amt, "staff_name": user_name, "date": str(datetime.now().date())}).execute()
+                st.success(f"Deal record ({d_status}) save ho gaya!")
+
+    # --- 7. HISTORY & DASHBOARD LOGIC (Ye Niche Nazar Aayenge) ---
+    st.markdown("---") # Visual separator
+
+    if history_menu == "📊 Daily Dashboard":
+        st.subheader("🚀 Staff Daily Progress Dashboard")
+        df_h = get_data('house_inventory')
+        df_d = get_data('deals')
         
-        with tab1:
-            st.dataframe(get_data('house_inventory'), use_container_width=True)
-        with tab2:
-            st.dataframe(get_data('client_leads'), use_container_width=True)
-        with tab3:
-            df_deals_all = get_data('deals')
-            if not df_deals_all.empty:
-                st.write("✅ **Mukammal Deals**")
-                st.dataframe(df_deals_all[df_deals_all['deal_status'] == 'Done'], use_container_width=True)
-                st.write("⏳ **Pending Deals**")
-                st.dataframe(df_deals_all[df_deals_all['deal_status'] == 'Pending'], use_container_width=True)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Properties", len(df_h))
+        m2.metric("Pending Deals", len(df_d[df_d['deal_status']=='Pending']) if not df_d.empty else 0)
+        m3.metric("Done Deals", len(df_d[df_d['deal_status']=='Done']) if not df_d.empty else 0)
+        
+        if not df_h.empty:
+            fig = px.bar(df_h.groupby('added_by').size().reset_index(name='Count'), x='added_by', y='Count', title="Kaunsa Staff Kitni Entry Kar Raha Hai?", color_discrete_sequence=['#FF4B4B'])
+            st.plotly_chart(fig, use_container_width=True)
+
+    elif history_menu == "📋 Full Inventory History":
+        st.subheader("📋 Tamam Gharon ka Record")
+        st.dataframe(get_data('house_inventory'), use_container_width=True)
+
+    elif history_menu == "⏳ Pending Deals List":
+        st.subheader("⏳ Pending Deals (Jinpar kaam chal raha hai)")
+        df_d = get_data('deals')
+        if not df_d.empty:
+            st.dataframe(df_d[df_d['deal_status'] == 'Pending'], use_container_width=True)
+        else: st.info("Koi Pending deal nahi hai.")
+
+    elif history_menu == "✅ Done Deals History":
+        st.subheader("✅ Done Deals (Closed Deals History)")
+        df_d = get_data('deals')
+        if not df_d.empty:
+            st.dataframe(df_d[df_d['deal_status'] == 'Done'], use_container_width=True)
+        else: st.info("Abhi tak koi deal close nahi hui.")
 
 else:
-    if pwd != "":
-        st.error("Please enter correct access code.")
+    if pwd != "": st.error("Access Code Ghalat Hai!")
 
 st.divider()
-st.caption(f"© {datetime.now().year} Deewary.com | Performance Tracking System Active")
+st.caption(f"© {datetime.now().year} Deewary.com | Active Session: {user_name}")
