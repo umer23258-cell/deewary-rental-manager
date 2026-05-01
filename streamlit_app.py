@@ -15,44 +15,31 @@ st.set_page_config(page_title="Deewary Pro Admin", layout="wide", page_icon="�
 
 st.markdown("""
     <style>
-    /* Main Dark Background */
-    [data-testid="stAppViewContainer"] {
-        background-color: #0E1117;
-        color: #FFFFFF;
-    }
+    [data-testid="stAppViewContainer"] { background-color: #0E1117; color: #FFFFFF; }
+    [data-testid="stSidebar"] { background-color: #161B22; border-right: 1px solid #30363D; }
     
-    /* Sidebar Dark Styling */
-    [data-testid="stSidebar"] {
-        background-color: #161B22;
-        border-right: 1px solid #30363D;
-    }
-
-    /* Professional Orange Metrics */
+    /* Stats Cards */
     .metric-card {
         background-color: #1C2128;
         padding: 20px;
-        border-radius: 10px;
+        border-radius: 12px;
         border: 1px solid #30363D;
-        border-top: 4px solid #FF8C00; /* Electric Orange */
+        border-top: 4px solid #FF8C00;
         text-align: center;
-        transition: 0.3s;
-    }
-    .metric-card:hover {
-        border-color: #FF8C00;
-        transform: translateY(-5px);
     }
     
-    /* Staff Performance Cards */
-    .staff-card {
-        background-color: #1C2128;
-        padding: 15px;
+    /* Performance Table Styling */
+    .perf-row {
+        background-color: #161B22;
+        padding: 12px;
         border-radius: 8px;
-        margin-bottom: 10px;
-        border-left: 5px solid #FF8C00;
-        color: #E6EDF3;
+        margin-bottom: 8px;
+        border-left: 4px solid #FF8C00;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
-    /* Orange Buttons */
     .stButton>button {
         background-color: #FF8C00;
         color: #000;
@@ -61,55 +48,41 @@ st.markdown("""
         border: none;
         width: 100%;
     }
-    .stButton>button:hover {
-        background-color: #FFA500;
-        color: #000;
-    }
-
-    /* Inputs Styling */
-    input, select, textarea {
-        background-color: #0D1117 !important;
-        color: white !important;
-        border: 1px solid #30363D !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. PDF FUNCTION (Table Format) ---
+# --- 3. PDF FUNCTION ---
 def generate_pdf(df, title):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
-    pdf.set_fill_color(255, 140, 0) # Orange Header
+    pdf.set_fill_color(255, 140, 0)
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, txt=title, ln=True, align='C')
     pdf.ln(5)
-    
     pdf.set_font("Arial", 'B', 10)
-    headers = ["ID", "Owner", "Location", "Portion", "Beds", "Rent", "Size", "Status"]
-    col_width = [15, 40, 60, 25, 25, 30, 30, 40]
-    
+    headers = ["ID", "Owner", "Location", "Portion", "Beds", "Rent", "Status", "Staff"]
+    col_width = [15, 35, 60, 30, 20, 30, 40, 35]
     for i in range(len(headers)):
         pdf.cell(col_width[i], 10, headers[i], 1, 0, 'C', 1)
     pdf.ln()
-    
     pdf.set_font("Arial", size=9)
     for _, row in df.iterrows():
         pdf.cell(col_width[0], 10, str(row.get('id', '')), 1)
-        pdf.cell(col_width[1], 10, str(row.get('owner_name', ''))[:15], 1)
-        pdf.cell(col_width[2], 10, str(row.get('location', ''))[:25], 1)
+        pdf.cell(col_width[1], 10, str(row.get('owner_name', ''))[:12], 1)
+        pdf.cell(col_width[2], 10, str(row.get('location', ''))[:22], 1)
         pdf.cell(col_width[3], 10, str(row.get('portion', '')), 1)
         pdf.cell(col_width[4], 10, str(row.get('beds', '')), 1)
         pdf.cell(col_width[5], 10, str(row.get('rent', '')), 1)
-        pdf.cell(col_width[6], 10, str(row.get('size', '')), 1)
-        pdf.cell(col_width[7], 10, str(row.get('status', '')), 1)
+        pdf.cell(col_width[6], 10, str(row.get('status', '')), 1)
+        pdf.cell(col_width[7], 10, str(row.get('added_by', '')), 1)
         pdf.ln()
     return pdf.output(dest='S').encode('latin-1')
 
 # --- 4. HEADER ---
 st.markdown("""
-    <div style="background-color: #161B22; padding: 15px; border-radius: 10px; border-bottom: 2px solid #FF8C00; margin-bottom: 20px;">
+    <div style="background-color: #161B22; padding: 15px; border-radius: 10px; border-bottom: 2px solid #FF8C00; margin-bottom: 25px;">
         <h2 style="color: #FF8C00; margin: 0; font-family: 'Segoe UI';">DEEWARY<span style="color: white;">.PRO</span></h2>
-        <p style="color: #8B949E; margin: 0; font-size: 12px; letter-spacing: 1px;">MANAGEMENT INTERFACE v2.0</p>
+        <p style="color: #8B949E; margin: 0; font-size: 12px; letter-spacing: 1.5px;">ADMIN PERFORMANCE DASHBOARD</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -119,104 +92,115 @@ pwd = st.sidebar.text_input("Security Pin", type="password")
 
 if pwd == "admin786":
     menu = st.sidebar.radio("NAVIGATE", [
-        "📈 Daily Insights", 
-        "📥 Data Entry", 
-        "📂 Database History",
+        "📊 Master Dashboard", 
+        "📥 New Entry", 
+        "📂 Database Records",
         "🛠️ Admin Tools",
         "🖨️ Export Reports"
     ])
 
-    # --- 6. DAILY INSIGHTS ---
-    if menu == "📈 Daily Insights":
-        st.markdown("### 📊 Today's Performance Metrics")
+    # --- 6. MASTER DASHBOARD (The Core Request) ---
+    if menu == "📊 Master Dashboard":
+        st.markdown(f"### 📈 Real-Time Performance: {date.today().strftime('%d %b, %Y')}")
+        
         today = date.today().isoformat()
+        h_today = supabase.table('house_inventory').select("*").gte('created_at', today).execute()
+        c_today = supabase.table('client_leads').select("*").gte('created_at', today).execute()
         
-        h_data = supabase.table('house_inventory').select("*").gte('created_at', today).execute()
-        c_data = supabase.table('client_leads').select("*").gte('created_at', today).execute()
+        df_h = pd.DataFrame(h_today.data)
+        df_c = pd.DataFrame(c_today.data)
+
+        # Top Stats Row
+        s1, s2, s3, s4 = st.columns(4)
+        with s1:
+            st.markdown(f'<div class="metric-card"><h2>{len(df_h)}</h2><p style="color:#8B949E;">Houses Added Today</p></div>', unsafe_allow_html=True)
+        with s2:
+            st.markdown(f'<div class="metric-card"><h2>{len(df_c)}</h2><p style="color:#8B949E;">Leads Added Today</p></div>', unsafe_allow_html=True)
+        with s3:
+            # Check for Deals Closed (Status changed to Rent Out today)
+            closed_today = len(df_h[df_h['status'] == 'Rent Out']) if not df_h.empty else 0
+            st.markdown(f'<div class="metric-card"><h2 style="color:#00FF00;">{closed_today}</h2><p style="color:#8B949E;">Deals Closed Today</p></div>', unsafe_allow_html=True)
+        with s4:
+            total_active = len(supabase.table('house_inventory').select("*").eq('status', 'Available').execute().data)
+            st.markdown(f'<div class="metric-card"><h2 style="color:#FF8C00;">{total_active}</h2><p style="color:#8B949E;">Total Available Stock</p></div>', unsafe_allow_html=True)
+
+        st.markdown("<br>#### 👤 Staff-Wise Work Report (Today)", unsafe_allow_html=True)
+        staff_members = ["Anas", "Sawer Khan", "Tariq Hussain"]
         
-        df_h = pd.DataFrame(h_data.data)
-        df_c = pd.DataFrame(c_data.data)
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(f'<div class="metric-card"><h3>{len(df_h)}</h3><p style="color:#8B949E;">Houses Added</p></div>', unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'<div class="metric-card"><h3>{len(df_c)}</h3><p style="color:#8B949E;">Leads Created</p></div>', unsafe_allow_html=True)
-        with c3:
-            closed = len(df_h[df_h['status'] == 'Rent Out']) if not df_h.empty else 0
-            st.markdown(f'<div class="metric-card"><h3 style="color:#00FF00;">{closed}</h3><p style="color:#8B949E;">Deals Closed</p></div>', unsafe_allow_html=True)
-
-        st.markdown("<br>#### 👤 Staff Contribution", unsafe_allow_html=True)
-        for staff in ["Anas", "Sawer Khan", "Tariq Hussain"]:
-            count_h = len(df_h[df_h['added_by'] == staff]) if not df_h.empty else 0
-            count_c = len(df_c[df_c['added_by'] == staff]) if not df_c.empty else 0
+        # Display Staff Table
+        for staff in staff_members:
+            s_h = len(df_h[df_h['added_by'] == staff]) if not df_h.empty else 0
+            s_c = len(df_c[df_c['added_by'] == staff]) if not df_c.empty else 0
+            s_deals = len(df_h[(df_h['added_by'] == staff) & (df_h['status'] == 'Rent Out')]) if not df_h.empty else 0
+            
             st.markdown(f"""
-            <div class="staff-card">
-                <b>{staff}</b>: &nbsp;&nbsp; {count_h} Properties &nbsp; | &nbsp; {count_c} Client Leads
+            <div class="perf-row">
+                <span style="font-size:18px; font-weight:bold; color:white;">{staff}</span>
+                <span style="color:#8B949E;">Properties: <b style="color:#FF8C00;">{s_h}</b></span>
+                <span style="color:#8B949E;">Clients: <b style="color:#FF8C00;">{s_c}</b></span>
+                <span style="color:#8B949E;">Deals Closed: <b style="color:#00FF00;">{s_deals}</b></span>
             </div>
             """, unsafe_allow_html=True)
 
-    # --- 7. DATA ENTRY (Houses & Clients) ---
-    elif menu == "📥 Data Entry":
-        st.markdown("### 📝 New Registration")
-        tab_h, tab_c = st.tabs(["🏠 Property Entry", "👤 Client Lead"])
-        
-        with tab_h:
-            with st.form("h_form"):
-                col_a, col_b = st.columns(2)
-                with col_a:
+    # --- 7. DATA ENTRY ---
+    elif menu == "📥 New Entry":
+        st.markdown("### 📝 Register Data")
+        t_h, t_c = st.tabs(["🏠 Property Entry", "👤 Client Lead"])
+        with t_h:
+            with st.form("h_form", clear_on_submit=True):
+                c_a, c_b = st.columns(2)
+                with c_a:
                     o_name = st.text_input("Owner Name")
-                    o_contact = st.text_input("Contact")
-                    loc = st.text_input("Location")
-                with col_b:
-                    beds = st.selectbox("Bedrooms", ["1", "2", "3", "4", "5+", "N/A"])
-                    rent = st.number_input("Demand Rent", min_value=0)
+                    o_contact = st.text_input("Phone")
+                    loc = st.text_input("Area")
+                with c_b:
+                    beds = st.selectbox("Beds", ["1","2","3","4","5+","N/A"])
+                    rent = st.number_input("Demand", min_value=0)
                     status = st.selectbox("Status", ["Available", "Rent Out"])
-                if st.form_submit_button("Submit Property"):
-                    supabase.table('house_inventory').insert({"owner_name": o_name, "contact": o_contact, "location": loc, "beds": beds, "rent": rent, "status": status, "added_by": user_name}).execute()
-                    st.success("Property Saved!")
-
-        with tab_c:
-            with st.form("c_form"):
+                if st.form_submit_button("Save Property"):
+                    supabase.table('house_inventory').insert({"owner_name":o_name, "contact":o_contact, "location":loc, "beds":beds, "rent":rent, "status":status, "added_by":user_name}).execute()
+                    st.success("Saved!")
+        with t_c:
+            with st.form("c_form", clear_on_submit=True):
                 cc1, cc2 = st.columns(2)
                 with cc1:
-                    cl_name = st.text_input("Client Name")
-                    cl_contact = st.text_input("Phone")
+                    cl_n = st.text_input("Client Name")
+                    cl_p = st.text_input("Phone")
                 with cc2:
-                    cl_budget = st.number_input("Budget", min_value=0)
-                    cl_loc = st.text_input("Area Preference")
-                if st.form_submit_button("Submit Lead"):
-                    supabase.table('client_leads').insert({"client_name": cl_name, "contact": cl_contact, "budget": cl_budget, "req_location": cl_loc, "added_by": user_name}).execute()
+                    cl_b = st.number_input("Budget", min_value=0)
+                    cl_l = st.text_input("Target Area")
+                if st.form_submit_button("Save Client Lead"):
+                    supabase.table('client_leads').insert({"client_name":cl_n, "contact":cl_p, "budget":cl_b, "req_location":cl_l, "added_by":user_name}).execute()
                     st.success("Lead Recorded!")
 
-    # --- 8. DATABASE HISTORY ---
-    elif menu == "📂 Database History":
-        h_res = supabase.table('house_inventory').select("*").execute()
-        st.markdown("#### 🏠 Full Property List")
-        st.dataframe(pd.DataFrame(h_res.data), use_container_width=True)
+    # --- 8. DATABASE RECORDS ---
+    elif menu == "📂 Database Records":
+        st.markdown("#### 📁 System Inventory")
+        data = supabase.table('house_inventory').select("*").execute()
+        st.dataframe(pd.DataFrame(data.data), use_container_width=True)
 
-    # --- 9. ADMIN TOOLS (Delete by ID) ---
+    # --- 9. ADMIN TOOLS ---
     elif menu == "🛠️ Admin Tools":
-        st.markdown("### ⚠️ Remove Records")
-        target_db = st.radio("Table", ["house_inventory", "client_leads"], horizontal=True)
-        del_id = st.number_input("Record ID", min_value=1, step=1)
-        if st.button("Delete Record"):
-            supabase.table(target_db).delete().eq("id", del_id).execute()
-            st.error(f"ID {del_id} deleted.")
+        st.markdown("### ⚙️ Management Console")
+        db_type = st.radio("Select Table", ["house_inventory", "client_leads"], horizontal=True)
+        target_id = st.number_input("Enter ID", min_value=1, step=1)
+        if st.button("Delete Record Permanently"):
+            supabase.table(db_type).delete().eq("id", target_id).execute()
+            st.error(f"Record {target_id} deleted.")
 
-    # --- 10. EXPORT REPORTS ---
+    # --- 10. EXPORT ---
     elif menu == "🖨️ Export Reports":
-        st.markdown("### 🔍 Filter & Print")
-        sq = st.text_input("Search Location or Status")
+        st.markdown("### 📄 Professional Reporting")
+        sq = st.text_input("Search Location/Status")
         raw = supabase.table('house_inventory').select("*").execute()
         df_r = pd.DataFrame(raw.data)
         if sq: df_r = df_r[df_r.astype(str).apply(lambda x: x.str.contains(sq, case=False)).any(axis=1)]
         st.dataframe(df_r, use_container_width=True)
-        if st.button("Generate Professional PDF"):
-            pdf_bytes = generate_pdf(df_r, "DEEWARY PRO INVENTORY")
-            st.download_button("📥 Download PDF", pdf_bytes, "Deewary_Pro_Report.pdf")
+        if st.button("Generate PDF Report"):
+            pdf = generate_pdf(df_r, "DEEWARY PRO - SYSTEM REPORT")
+            st.download_button("📥 Download PDF", pdf, "Deewary_Report.pdf")
 
 else:
-    st.markdown("<h4 style='text-align:center;'>🔒 Unauthorized Access. Please enter the Pin.</h4>", unsafe_allow_html=True)
+    st.info("🔒 Security Pin Required.")
 
-st.markdown("<br><p style='text-align:center; color:#30363D;'>System Admin: Anas | Version 2.0</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; color:#30363D;'>System Admin: Anas | Real Estate & Construction Management</p>", unsafe_allow_html=True)
