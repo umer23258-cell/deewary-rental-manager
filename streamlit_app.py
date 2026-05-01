@@ -13,10 +13,9 @@ supabase: Client = create_client(url, key)
 # --- 2. PAGE CONFIG ---
 st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
 
-# Hide Streamlit UI
 st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}</style>", unsafe_allow_html=True)
 
-# --- 3. FUNCTIONS (PDF) ---
+# --- 3. PDF FUNCTION ---
 def generate_pdf(df, title):
     pdf = FPDF()
     pdf.add_page()
@@ -26,7 +25,6 @@ def generate_pdf(df, title):
     pdf.ln(10)
     for i in range(len(df)):
         row = df.iloc[i]
-        # Yahan beds bhi shamil kar diya hai report mein
         text = f"{i+1}. " + " | ".join([f"{col}: {row[col]}" for col in df.columns[:6]])
         pdf.multi_cell(0, 10, txt=text)
         pdf.ln(2)
@@ -49,8 +47,8 @@ if pwd == "admin786":
     menu = st.sidebar.radio("KAAM SELECT KAREN", [
         "🏠 Ghar ki Entry (Owners)", 
         "👤 Client ki Entry (Tenants)", 
-        "📋 House History (Edit/Delete)",
-        "👥 Client History (Edit/Delete)",
+        "📋 Full History (View Only)",
+        "🛠️ Manage Records (Edit/Delete)", # Naya Dashboard
         "🔍 Search & Print PDF"
     ])
 
@@ -65,72 +63,70 @@ if pwd == "admin786":
                 loc = st.text_input("Location")
                 portion = st.selectbox("Portion", ["Full House", "Ground Floor", "First Floor", "Shop"])
             with c2:
-                # BEDS ka column yahan add kiya hai
                 beds = st.selectbox("Bedrooms (Beds)", ["1", "2", "3", "4", "5+", "N/A"])
                 rent = st.number_input("Rent", min_value=0)
                 size = st.text_input("Size (Marla)")
                 status = st.selectbox("Status", ["Available", "Rent Out"])
             if st.form_submit_button("Save Record"):
-                payload = {
-                    "owner_name": o_name, "contact": o_contact, "location": loc, 
-                    "portion": portion, "beds": beds, "rent": rent, 
-                    "size": size, "status": status, "added_by": user_name
-                }
+                payload = {"owner_name": o_name, "contact": o_contact, "location": loc, "portion": portion, "beds": beds, "rent": rent, "size": size, "status": status, "added_by": user_name}
                 supabase.table('house_inventory').insert(payload).execute()
-                st.success("Data Saved!")
+                st.success("Record Saved!")
 
-    # --- 7. HOUSE HISTORY (EDIT/DELETE) ---
-    elif menu == "📋 House History (Edit/Delete)":
-        res = supabase.table('house_inventory').select("*").execute()
-        df = pd.DataFrame(res.data)
-        if not df.empty:
-            for index, row in df.iterrows():
-                # Expander mein beds show honge
-                with st.expander(f"📍 {row['location']} ({row.get('beds', 'N/A')} Beds) - {row['owner_name']}"):
-                    col_e1, col_e2, col_e3 = st.columns([2, 1, 1])
-                    new_status = col_e1.selectbox("Update Status", ["Available", "Rent Out"], key=f"status_{row['id']}", index=0 if row['status']=='Available' else 1)
-                    if col_e2.button("Update", key=f"upd_{row['id']}"):
-                        supabase.table('house_inventory').update({"status": new_status}).eq("id", row['id']).execute()
-                        st.rerun()
-                    if col_e3.button("🗑️ Delete", key=f"del_{row['id']}"):
-                        supabase.table('house_inventory').delete().eq("id", row['id']).execute()
-                        st.rerun()
-            st.dataframe(df, use_container_width=True)
+    # --- 7. FULL HISTORY (VIEW ONLY) ---
+    elif menu == "📋 Full History (View Only)":
+        st.subheader("📋 Tamam Records")
+        t1, t2 = st.tabs(["Ghar/Shops", "Clients"])
+        with t1:
+            df_h = pd.DataFrame(supabase.table('house_inventory').select("*").execute().data)
+            st.dataframe(df_h, use_container_width=True)
+        with t2:
+            df_c = pd.DataFrame(supabase.table('client_leads').select("*").execute().data)
+            st.dataframe(df_c, use_container_width=True)
 
-    # --- 8. CLIENT HISTORY ---
-    elif menu == "👥 Client History (Edit/Delete)":
-        res = supabase.table('client_leads').select("*").execute()
-        df = pd.DataFrame(res.data)
-        if not df.empty:
-            for index, row in df.iterrows():
-                with st.expander(f"👤 {row['client_name']} - {row['req_location']}"):
-                    if st.button(f"🗑️ Delete Client {row['id']}", key=f"cdel_{row['id']}"):
-                        supabase.table('client_leads').delete().eq("id", row['id']).execute()
-                        st.rerun()
-            st.dataframe(df, use_container_width=True)
+    # --- 8. MANAGE RECORDS (EDIT/DELETE BY ID) ---
+    elif menu == "🛠️ Manage Records (Edit/Delete)":
+        st.subheader("🛠️ Search by ID to Edit or Delete")
+        target_table = st.radio("Select Table", ["house_inventory", "client_leads"], horizontal=True)
+        search_id = st.number_input("Enter ID Number", min_value=1, step=1)
+        
+        if st.button("Find Record"):
+            res = supabase.table(target_table).select("*").eq("id", search_id).execute()
+            if res.data:
+                record = res.data[0]
+                st.write("---")
+                st.write(f"**Current Data:** {record}")
+                
+                # Edit Section
+                st.markdown("### Update Status")
+                if target_table == "house_inventory":
+                    new_val = st.selectbox("New Status", ["Available", "Rent Out"], index=0 if record['status'] == 'Available' else 1)
+                    if st.button("Confirm Update"):
+                        supabase.table(target_table).update({"status": new_val}).eq("id", search_id).execute()
+                        st.success("Status Updated!")
+                
+                # Delete Section
+                st.markdown("### Danger Zone")
+                if st.button("🗑️ Permanently Delete Record"):
+                    supabase.table(target_table).delete().eq("id", search_id).execute()
+                    st.warning(f"Record ID {search_id} Deleted!")
+            else:
+                st.error("Is ID ka koi record nahi mila.")
 
     # --- 9. SEARCH & PRINT ---
     elif menu == "🔍 Search & Print PDF":
-        search = st.text_input("Search by Location or Contact")
-        t1, t2 = st.tabs(["Houses", "Clients"])
-        
-        with t1:
-            data = supabase.table('house_inventory').select("*").execute()
-            df_h = pd.DataFrame(data.data)
-            if search: df_h = df_h[df_h.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-            st.dataframe(df_h)
-            if st.button("Download House List PDF"):
-                pdf_bytes = generate_pdf(df_h, "Deewary House Inventory")
-                st.download_button("Download Now", pdf_bytes, "houses.pdf", "application/pdf")
-
-        with t2:
-            data_c = supabase.table('client_leads').select("*").execute()
-            df_c = pd.DataFrame(data_c.data)
-            if search: df_c = df_c[df_c.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-            st.dataframe(df_c)
-            if st.button("Download Client List PDF"):
-                pdf_bytes = generate_pdf(df_c, "Deewary Client Leads")
-                st.download_button("Download Now", pdf_bytes, "clients.pdf", "application/pdf")
+        search = st.text_input("Search (Location/Name/Contact)")
+        res = supabase.table('house_inventory').select("*").execute()
+        df = pd.DataFrame(res.data)
+        if search and not df.empty:
+            df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+        st.dataframe(df)
+        if st.button("Download PDF"):
+            pdf_bytes = generate_pdf(df, "Property Report")
+            st.download_button("Download Now", pdf_bytes, "report.pdf")
 
 else:
     st.warning("Access Code 'admin786' istemal karen.")
+
+st.divider()
+st.caption(f"© {datetime.now().year} Deewary.com | Manager: {user_name}")
+                
