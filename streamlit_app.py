@@ -59,53 +59,74 @@ if pwd == "admin786":
     if st.sidebar.button("📊 Dashboard Overview", use_container_width=True): set_menu("🏠 Dashboard")
     if st.sidebar.button("🏠 Add House/Shop", use_container_width=True): set_menu("🏠 Ghar Entry")
     if st.sidebar.button("👤 Add New Client", use_container_width=True): set_menu("👤 Client Entry")
+    if st.sidebar.button("🚶 Add Property Visit", use_container_width=True): set_menu("🚶 Visit Entry")
     if st.sidebar.button("💬 Discussion Log", use_container_width=True): set_menu("💬 Discussion")
     
     st.sidebar.subheader("📂 View Records")
     if st.sidebar.button("📋 House Inventory", use_container_width=True): set_menu("📋 House History")
     if st.sidebar.button("👥 Client Database", use_container_width=True): set_menu("👥 Client History")
+    if st.sidebar.button("📅 Visit History", use_container_width=True): set_menu("📅 Visit History")
     if st.sidebar.button("💰 Done Deals", use_container_width=True): set_menu("💰 Done History")
 
     menu = st.session_state.menu
 
-    # --- 6. DASHBOARD (PROFESSIONAL WITH USER TRACKING) ---
+    # --- 6. DASHBOARD ---
     if menu == "🏠 Dashboard":
         st.subheader(f"👋 Welcome, {user_name}")
         
         # Data Fetching
         h_data = supabase.table('house_inventory').select("*").execute()
         c_data = supabase.table('client_leads').select("*").execute()
+        v_data = supabase.table('property_visits').select("*").execute() # Nayi Table
         d_data = supabase.table('deals_done').select("*").execute()
         
         df_h = pd.DataFrame(h_data.data) if h_data.data else pd.DataFrame()
         df_c = pd.DataFrame(c_data.data) if c_data.data else pd.DataFrame()
+        df_v = pd.DataFrame(v_data.data) if v_data.data else pd.DataFrame()
         df_d = pd.DataFrame(d_data.data) if d_data.data else pd.DataFrame()
 
         # Stats Cards
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
         kpi1.metric("Total Houses", len(df_h))
-        kpi2.metric("Available", len(df_h[df_h['status'] == 'Available']) if not df_h.empty else 0)
-        kpi3.metric("Total Clients", len(df_c))
+        kpi2.metric("Total Clients", len(df_c))
+        kpi3.metric("Property Visits", len(df_v))
         kpi4.metric("Deals Done", len(df_d))
 
         st.markdown("---")
         
-        # Daily Progress Table with User Column
-        st.markdown("### 📅 Daily Progress (Added By)")
+        st.markdown("### 📅 Recent Activity Tracking")
         col_a, col_b = st.columns(2)
         
         with col_a:
-            st.write("#### 🏠 Recent Houses")
-            if not df_h.empty:
-                # 'added_by' column shows Sawer or Tariq
-                st.dataframe(df_h[['added_by', 'owner_name', 'location', 'rent', 'status']].head(10), use_container_width=True)
+            st.write("#### 🚶 Latest Visits")
+            if not df_v.empty:
+                st.dataframe(df_v[['added_by', 'client_name', 'property_detail', 'visit_date']].head(10), use_container_width=True)
+            else: st.info("No visits recorded yet.")
         
         with col_b:
-            st.write("#### 👥 New Clients")
-            if not df_c.empty:
-                st.dataframe(df_c[['added_by', 'client_name', 'budget', 'status']].head(10), use_container_width=True)
+            st.write("#### 🏠 New Houses")
+            if not df_h.empty:
+                st.dataframe(df_h[['added_by', 'owner_name', 'location', 'status']].head(10), use_container_width=True)
 
-    # --- 7. FORMS SECTION ---
+    # --- 7. NEW VISIT ENTRY FORM ---
+    elif menu == "🚶 Visit Entry":
+        st.subheader("🚶 Record a New Property Visit")
+        with st.form("v_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                v_client = st.text_input("Client Name")
+                v_prop = st.text_area("Property Detail (Which house shown?)")
+            with c2:
+                v_date = st.date_input("Visit Date")
+                v_feedback = st.text_input("Client Feedback (Optional)")
+            if st.form_submit_button("Save Visit Record"):
+                supabase.table('property_visits').insert({
+                    "client_name": v_client, "property_detail": v_prop, 
+                    "visit_date": str(v_date), "feedback": v_feedback, "added_by": user_name
+                }).execute()
+                st.success(f"Visit saved by {user_name}!")
+
+    # --- 8. OTHER FORMS (House, Client, Discussion) ---
     elif menu == "🏠 Ghar Entry":
         st.subheader("🏡 Property Detail Form")
         with st.form("h_form", clear_on_submit=True):
@@ -142,7 +163,7 @@ if pwd == "admin786":
                 }).execute()
                 st.success(f"Client recorded by {user_name}")
 
-    # --- 8. HISTORY SECTION (Fixed Syntax for image_a2b4c6.png) ---
+    # --- 9. HISTORY SECTIONS ---
     def show_history(table_name):
         res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
@@ -170,6 +191,7 @@ if pwd == "admin786":
 
     if menu == "📋 House History": show_history('house_inventory')
     elif menu == "👥 Client History": show_history('client_leads')
+    elif menu == "📅 Visit History": show_history('property_visits')
     elif menu == "💰 Done History": show_history('deals_done')
 
 else:
