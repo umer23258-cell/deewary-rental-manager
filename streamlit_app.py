@@ -130,52 +130,40 @@ if pwd == "admin786":
                 supabase.table('deals_done').insert({"client_name": dc_n, "owner_name": do_n, "property_address": dp_a, "final_rent": dr, "commission": dcom, "agent_name": user_name}).execute()
                 st.success("Deal Done save!")
 
-    # --- 11. ALL HISTORY SECTIONS ---
-    elif menu == "📋 Gharon ki History":
-        res = supabase.table('house_inventory').select("*").order('id', desc=True).execute()
+    # --- 11. HISTORY SECTIONS (WITH TABLES) ---
+    def show_history(table_name):
+        res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
             df = pd.DataFrame(res.data)
-            for _, row in df.iterrows():
-                sc = "🟢" if row['status'] == "Available" else "🔴"
-                with st.expander(f"{sc} ID: {row['id']} | {row['owner_name']} - {row['location']}"):
-                    st.write(f"**Rent:** {row['rent']} | **Beds:** {row['beds']} | **Admin:** {row['added_by']}")
-                    if st.button(f"🗑️ Delete ID {row['id']}", key=f"del_h_{row['id']}"): delete_record('house_inventory', row['id'])
+            st.dataframe(df, use_container_width=True)
+            
+            # Deletion Option
+            st.markdown("---")
+            del_id = st.number_input(f"Enter ID to delete from {table_name}", min_value=0, step=1, key=f"del_input_{table_name}")
+            if st.button(f"Confirm Delete ID {del_id}", key=f"btn_{table_name}"):
+                delete_record(table_name, del_id)
+        else:
+            st.info("Abhi koi data majood nahi hai.")
+
+    if menu == "📋 Gharon ki History":
+        st.subheader("📋 House Inventory Record")
+        show_history('house_inventory')
 
     elif menu == "👥 New Clients History":
-        res = supabase.table('client_leads').select("*").order('id', desc=True).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            for _, row in df.iterrows():
-                with st.expander(f"ID: {row['id']} | {row['client_name']} ({row['status']})"):
-                    st.write(f"**Budget:** {row['budget']} | **Admin:** {row['added_by']}")
-                    if st.button(f"🗑️ Delete ID {row['id']}", key=f"del_c_{row['id']}"): delete_record('client_leads', row['id'])
+        st.subheader("👥 Client Leads Record")
+        show_history('client_leads')
 
     elif menu == "🗣️ Discussion History":
-        res = supabase.table('client_discussions').select("*").order('id', desc=True).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            for _, row in df.iterrows():
-                with st.expander(f"ID: {row['id']} | {row['client_name']}"):
-                    st.write(f"**Notes:** {row['notes']} | **Agent:** {row['agent']}")
-                    if st.button(f"🗑️ Delete ID {row['id']}", key=f"del_d_{row['id']}"): delete_record('client_discussions', row['id'])
+        st.subheader("🗣️ Conversations History")
+        show_history('client_discussions')
 
     elif menu == "📂 Pending Deals History":
-        res = supabase.table('deals_pending').select("*").order('id', desc=True).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            for _, row in df.iterrows():
-                with st.expander(f"ID: {row['id']} | {row['client_name']} (Token: {row['token_amount']})"):
-                    st.write(f"**Property:** {row['property_details']} | **Date:** {row['expected_date']}")
-                    if st.button(f"🗑️ Delete ID {row['id']}", key=f"del_p_{row['id']}"): delete_record('deals_pending', row['id'])
+        st.subheader("📂 Token/Pending Deals")
+        show_history('deals_pending')
 
     elif menu == "💰 Done Deals History":
-        res = supabase.table('deals_done').select("*").order('id', desc=True).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            for _, row in df.iterrows():
-                with st.expander(f"✅ ID: {row['id']} | {row['client_name']} - {row['property_address']}"):
-                    st.write(f"**Owner:** {row['owner_name']} | **Admin:** {row['agent_name']} | **Comm:** {row['commission']}")
-                    if st.button(f"🗑️ Delete ID {row['id']}", key=f"del_done_{row['id']}"): delete_record('deals_done', row['id'])
+        st.subheader("💰 Closed Deals Record")
+        show_history('deals_done')
 
     elif menu == "🏠 Dashboard":
         st.subheader(f"Welcome, {user_name}")
