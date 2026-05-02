@@ -8,22 +8,33 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- 2. PAGE CONFIG (Yahan change kiya hai taake sidebar hamesha khuli rahe) ---
+# --- 2. PAGE CONFIG ---
 st.set_page_config(
     page_title="Deewary Property Manager", 
     layout="wide", 
     page_icon="🏢",
-    initial_sidebar_state="expanded" # Is se mobile par sidebar khud khulegi
+    initial_sidebar_state="expanded" # Mobile pe pehli baar khula nazar ayega
 )
 
-# Mobile Friendly Styling
+# --- MOBILE SIDEBAR FIX CSS ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     
-    /* Yeh code mobile par sidebar ka arrow button hamesha samne rakhega */
-    .st-emotion-cache-zq5wmm { display: block !important; }
-    .st-emotion-cache-18ni7ve { display: block !important; }
+    /* Mobile par Sidebar ka arrow button hamesha dikhane ke liye */
+    section[data-testid="stSidebar"] {
+        transition: all 0.3s;
+    }
+    
+    /* Sidebar ke button ko customize karna taake wo asani se click ho */
+    .st-emotion-cache-zq5wmm {
+        display: block !important;
+        background-color: #FF4B4B !important;
+        color: white !important;
+        border-radius: 50% !important;
+        left: 10px !important;
+        top: 10px !important;
+    }
 
     .login-box {
         background-color: #1E1E1E; 
@@ -47,7 +58,7 @@ def update_record(table_name, record_id, data_dict):
     st.success(f"Record ID {record_id} update ho gaya!")
     st.rerun()
 
-# --- 4. LOGIN SYSTEM (Mobile Optimized) ---
+# --- 4. LOGIN SYSTEM ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -71,7 +82,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Code Ghalat Hai!")
         st.markdown('</div>', unsafe_allow_html=True)
-    st.stop() # Login nahi toh aage kuch nahi dikhega
+    st.stop()
 
 # --- 5. LOGGED IN CONTENT ---
 user_name = st.session_state.user_name
@@ -84,7 +95,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# SIDEBAR MENU (Login ke baad display hoga)
+# SIDEBAR MENU
 st.sidebar.title("🚀 Navigation")
 if "menu" not in st.session_state:
     st.session_state.menu = "🏠 Dashboard"
@@ -113,7 +124,6 @@ menu = st.session_state.menu
 # --- 6. DASHBOARD LOGIC ---
 if menu == "🏠 Dashboard":
     st.subheader("📊 Business Overview")
-    
     h_res = supabase.table('house_inventory').select("*").execute()
     c_res = supabase.table('client_leads').select("*").execute()
     d_res = supabase.table('deals_done').select("*").execute()
@@ -132,7 +142,7 @@ if menu == "🏠 Dashboard":
     if not df_h.empty:
         st.dataframe(df_h[['added_by', 'owner_name', 'location', 'rent', 'status']].head(10), use_container_width=True)
 
-# --- 7. ENTRY FORMS (Ghar Entry Example) ---
+# --- 7. ENTRY FORMS ---
 elif menu == "🏠 Ghar Entry":
     st.subheader("🏡 Naye Ghar ki Entry")
     with st.form("house_form", clear_on_submit=True):
@@ -153,7 +163,6 @@ elif menu == "📋 History":
     if res.data:
         df = pd.DataFrame(res.data)
         st.dataframe(df, use_container_width=True)
-        
         st.markdown("---")
         del_id = st.number_input("ID to Delete", min_value=0, step=1)
         if st.button("🗑️ Confirm Delete"):
