@@ -33,30 +33,41 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR & MENU ---
+# --- 5. SIDEBAR & MENU (SIMPLE BUTTONS STYLE) ---
 st.sidebar.title("🔐 Staff Access")
 user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Anas", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
-    menu = st.sidebar.radio("KAAM SELECT KAREN", [
-        "🏠 Dashboard",
-        "--- NAYI ENTRY ---",
-        "🏠 Ghar ki Entry (Owners)", 
-        "👤 Client ki Entry (New)",
-        "💬 Client in Discussion",
-        "⏳ Deal Pending Entry",
-        "✅ Deal Done Entry",
-        "--- RECORDS & HISTORY ---",
-        "📋 Gharon ki History",
-        "👥 New Clients History",
-        "🗣️ Discussion History",
-        "📂 Pending Deals History",
-        "💰 Done Deals History"
-    ])
+    st.sidebar.markdown("---")
+    
+    # Session State for Menu Tracking
+    if "menu" not in st.session_state:
+        st.session_state.menu = "🏠 Dashboard"
 
-    # [Note: Sections 6 to 10 (Entry Forms) will remain exactly as your original code]
-    # --- 6. GHAR KI ENTRY FORM ---
+    def set_menu(name):
+        st.session_state.menu = name
+
+    # Sidebar Buttons
+    if st.sidebar.button("🏠 Dashboard", use_container_width=True): set_menu("🏠 Dashboard")
+    
+    st.sidebar.markdown("### **--- NAYI ENTRY ---**")
+    if st.sidebar.button("🏠 Ghar ki Entry", use_container_width=True): set_menu("🏠 Ghar ki Entry (Owners)")
+    if st.sidebar.button("👤 Client ki Entry", use_container_width=True): set_menu("👤 Client ki Entry (New)")
+    if st.sidebar.button("💬 Client Discussion", use_container_width=True): set_menu("💬 Client in Discussion")
+    if st.sidebar.button("⏳ Deal Pending", use_container_width=True): set_menu("⏳ Deal Pending Entry")
+    if st.sidebar.button("✅ Deal Done", use_container_width=True): set_menu("✅ Deal Done Entry")
+
+    st.sidebar.markdown("### **--- HISTORY ---**")
+    if st.sidebar.button("📋 Gharon ki History", use_container_width=True): set_menu("📋 Gharon ki History")
+    if st.sidebar.button("👥 New Clients History", use_container_width=True): set_menu("👥 New Clients History")
+    if st.sidebar.button("🗣️ Discussion History", use_container_width=True): set_menu("🗣️ Discussion History")
+    if st.sidebar.button("📂 Pending History", use_container_width=True): set_menu("📂 Pending Deals History")
+    if st.sidebar.button("💰 Done History", use_container_width=True): set_menu("💰 Done Deals History")
+
+    menu = st.session_state.menu
+
+    # --- 6. FORMS LOGIC ---
     if menu == "🏠 Ghar ki Entry (Owners)":
         st.subheader("🏡 Naye Ghar ya Shop ki Detail")
         with st.form("house_form", clear_on_submit=True):
@@ -125,14 +136,14 @@ if pwd == "admin786":
         with st.form("done_form", clear_on_submit=True):
             dc_n = st.text_input("Client Name")
             do_n = st.text_input("Owner Name")
-            dp_a = st.text_input("Property Address (Jo Rent Out hui)")
+            dp_a = st.text_input("Property Address")
             dr = st.number_input("Final Rent", min_value=0)
             dcom = st.number_input("Commission", min_value=0)
             if st.form_submit_button("Save Done Deal"):
                 supabase.table('deals_done').insert({"client_name": dc_n, "owner_name": do_n, "property_address": dp_a, "final_rent": dr, "commission": dcom, "agent_name": user_name}).execute()
                 st.success("Deal Done save!")
 
-    # --- 11. HISTORY SECTIONS (WITH TABLES & EDIT) ---
+    # --- 7. HISTORY WITH EDIT & DELETE ---
     def show_history(table_name):
         res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
@@ -140,63 +151,36 @@ if pwd == "admin786":
             st.dataframe(df, use_container_width=True)
             
             st.markdown("---")
-            col_del, col_edit = st.columns(2)
-            
-            with col_del:
-                st.write("🗑️ **Delete Record**")
-                del_id = st.number_input(f"ID to delete", min_value=0, step=1, key=f"del_in_{table_name}")
-                if st.button(f"Confirm Delete ID {del_id}", key=f"del_btn_{table_name}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                del_id = st.number_input(f"Delete ID from {table_name}", min_value=0, step=1, key=f"del_{table_name}")
+                if st.button(f"🗑️ Confirm Delete ID {del_id}", key=f"btn_del_{table_name}"):
                     delete_record(table_name, del_id)
-            
-            with col_edit:
-                st.write("✏️ **Edit Record**")
-                edit_id = st.number_input(f"ID to edit", min_value=0, step=1, key=f"edit_in_{table_name}")
-                
-                # Agar edit ID input ki gayi hai to form dikhayen
+            with col2:
+                edit_id = st.number_input(f"Edit ID from {table_name}", min_value=0, step=1, key=f"edit_{table_name}")
                 if edit_id > 0:
-                    record = next((item for item in res.data if item["id"] == edit_id), None)
-                    if record:
+                    rec = next((item for item in res.data if item["id"] == edit_id), None)
+                    if rec:
                         with st.expander(f"Editing ID: {edit_id}"):
-                            with st.form(f"edit_form_{table_name}_{edit_id}"):
-                                updated_values = {}
-                                # Dinamic fields based on table
-                                for key in record.keys():
-                                    if key not in ['id', 'created_at', 'added_by', 'agent', 'agent_name']:
-                                        if isinstance(record[key], int):
-                                            updated_values[key] = st.number_input(f"New {key}", value=record[key])
+                            with st.form(f"form_edit_{table_name}_{edit_id}"):
+                                updated_data = {}
+                                for k, v in rec.items():
+                                    if k not in ['id', 'created_at', 'added_by', 'agent', 'agent_name']:
+                                        if isinstance(v, int):
+                                            updated_data[k] = st.number_input(f"{k}", value=v)
                                         else:
-                                            updated_values[key] = st.text_input(f"New {key}", value=str(record[key]))
-                                
-                                if st.form_submit_button("Save Changes"):
-                                    update_record(table_name, edit_id, updated_values)
-                    else:
-                        st.error("Ye ID nahi mili.")
-        else:
-            st.info("Abhi koi data majood nahi hai.")
+                                            updated_data[k] = st.text_input(f"{k}", value=str(v))
+                                if st.form_submit_button("Update"):
+                                    update_record(table_name, edit_id, updated_data)
 
-    if menu == "📋 Gharon ki History":
-        st.subheader("📋 House Inventory Record")
-        show_history('house_inventory')
-
-    elif menu == "👥 New Clients History":
-        st.subheader("👥 Client Leads Record")
-        show_history('client_leads')
-
-    elif menu == "🗣️ Discussion History":
-        st.subheader("🗣️ Conversations History")
-        show_history('client_discussions')
-
-    elif menu == "📂 Pending Deals History":
-        st.subheader("📂 Token/Pending Deals")
-        show_history('deals_pending')
-
-    elif menu == "💰 Done Deals History":
-        st.subheader("💰 Closed Deals Record")
-        show_history('deals_done')
-
+    if menu == "📋 Gharon ki History": show_history('house_inventory')
+    elif menu == "👥 New Clients History": show_history('client_leads')
+    elif menu == "🗣️ Discussion History": show_history('client_discussions')
+    elif menu == "📂 Pending Deals History": show_history('deals_pending')
+    elif menu == "💰 Done Deals History": show_history('deals_done')
     elif menu == "🏠 Dashboard":
         st.subheader(f"Welcome, {user_name}")
-        st.write("Kaam shuru karne ke liye side menu se option select karen.")
+        st.info("Side menu se button click kar ke kaam shuru karen.")
 
 else:
     if pwd != "": st.error("Code Ghalat Hai!")
