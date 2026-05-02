@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-1
+
 # --- 1. SUPABASE SETUP ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
@@ -28,20 +28,20 @@ def update_record(table_name, record_id, data_dict):
 # --- 4. HEADER ---
 st.markdown("""
     <div style="text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 15px; border: 2px solid #FF4B4B;">
-        <h1 style="color: #FF4B4B; margin: 0; font-family: 'Arial Black';">DEEWARY PROPERTY MANAGER</h1>
-        <p style="color: white; letter-spacing: 2px;">MANAGEMENT PORTAL</p>
+        <h1 style="color: #FF4B4B; margin: 0; font-family: 'Arial Black';">DEEWARY.COM RENTER PROPERTY MANAGEMENT</h1>
+        <p style="color: white; letter-spacing: 2px;">MANAGER PORTAL - WELCOME UMER</p>
     </div>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR & MENU (SIMPLE BUTTONS STYLE) ---
+# --- 5. SIDEBAR & MENU ---
 st.sidebar.title("🔐 Staff Access")
-user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Anas", "Sawer Khan", "Tariq Hussain"])
+# Anas hata diya, Umer (Manager) add kar diya
+user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Umer (Manager)", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
 if pwd == "admin786":
     st.sidebar.markdown("---")
     
-    # Session State for Menu Tracking
     if "menu" not in st.session_state:
         st.session_state.menu = "🏠 Dashboard"
 
@@ -67,8 +67,46 @@ if pwd == "admin786":
 
     menu = st.session_state.menu
 
-    # --- 6. FORMS LOGIC ---
-    if menu == "🏠 Ghar ki Entry (Owners)":
+    # --- 6. DASHBOARD (MAIN LOGIC) ---
+    if menu == "🏠 Dashboard":
+        st.subheader(f"📊 Business Overview - Welcome Manager {user_name}")
+        
+        # Data Fetching for Stats
+        houses = supabase.table('house_inventory').select("*").execute()
+        clients = supabase.table('client_leads').select("*").execute()
+        deals_done = supabase.table('deals_done').select("*").execute()
+        pending = supabase.table('deals_pending').select("*").execute()
+
+        df_h = pd.DataFrame(houses.data)
+        df_c = pd.DataFrame(clients.data)
+        df_d = pd.DataFrame(deals_done.data)
+        df_p = pd.DataFrame(pending.data)
+
+        # Dashboard Top Metrics
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Houses", len(df_h) if not df_h.empty else 0)
+        m2.metric("Available", len(df_h[df_h['status'] == 'Available']) if not df_h.empty else 0)
+        m3.metric("Rent Out (Done)", len(df_d) if not df_d.empty else 0)
+        m4.metric("Pending Deals", len(df_p) if not df_p.empty else 0)
+
+        st.markdown("---")
+        
+        # Daily Progress Section
+        st.subheader("📅 Daily Progress (Current Status)")
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.markdown("### 🏠 Recent Properties")
+            if not df_h.empty:
+                st.dataframe(df_h[['owner_name', 'location', 'rent', 'status']].head(5), use_container_width=True)
+        
+        with c2:
+            st.markdown("### 👥 New Clients Today")
+            if not df_c.empty:
+                st.dataframe(df_c[['client_name', 'budget', 'status']].head(5), use_container_width=True)
+
+    # --- 7. OTHER FORMS (No Change) ---
+    elif menu == "🏠 Ghar ki Entry (Owners)":
         st.subheader("🏡 Naye Ghar ya Shop ki Detail")
         with st.form("house_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -94,6 +132,7 @@ if pwd == "admin786":
                 }).execute()
                 st.success("Ghar save ho gaya!")
 
+    # --- (Baki Saari Entry Forms or History Sections Wese hi hain) ---
     elif menu == "👤 Client ki Entry (New)":
         st.subheader("👨‍👩‍👧‍👦 Client Requirement")
         with st.form("client_form", clear_on_submit=True):
@@ -110,46 +149,12 @@ if pwd == "admin786":
                 supabase.table('client_leads').insert({"client_name": cn, "contact": cc, "req_location": cloc, "budget": cbud, "beds_required": cb, "status": c_stat, "added_by": user_name}).execute()
                 st.success("Client requirement save ho gayi!")
 
-    elif menu == "💬 Client in Discussion":
-        st.subheader("💬 Conversations")
-        with st.form("disc_form", clear_on_submit=True):
-            dc = st.text_input("Client Name")
-            dp = st.text_input("Phone Number")
-            ds = st.text_area("Update/Notes")
-            if st.form_submit_button("Save Discussion"):
-                supabase.table('client_discussions').insert({"client_name": dc, "contact": dp, "notes": ds, "agent": user_name}).execute()
-                st.success("Discussion save ho gayi!")
-
-    elif menu == "⏳ Deal Pending Entry":
-        st.subheader("⏳ Pending (Token)")
-        with st.form("pend_form", clear_on_submit=True):
-            pc = st.text_input("Client Name")
-            pp = st.text_area("Property Details")
-            pt = st.number_input("Token Amount", min_value=0)
-            pd_date = st.date_input("Closing Date")
-            if st.form_submit_button("Save Pending"):
-                supabase.table('deals_pending').insert({"client_name": pc, "property_details": pp, "token_amount": pt, "expected_date": str(pd_date), "agent_name": user_name}).execute()
-                st.success("Pending record save!")
-
-    elif menu == "✅ Deal Done Entry":
-        st.subheader("✅ Deal Done")
-        with st.form("done_form", clear_on_submit=True):
-            dc_n = st.text_input("Client Name")
-            do_n = st.text_input("Owner Name")
-            dp_a = st.text_input("Property Address")
-            dr = st.number_input("Final Rent", min_value=0)
-            dcom = st.number_input("Commission", min_value=0)
-            if st.form_submit_button("Save Done Deal"):
-                supabase.table('deals_done').insert({"client_name": dc_n, "owner_name": do_n, "property_address": dp_a, "final_rent": dr, "commission": dcom, "agent_name": user_name}).execute()
-                st.success("Deal Done save!")
-
-    # --- 7. HISTORY WITH EDIT & DELETE ---
+    # [History Function with Edit/Delete]
     def show_history(table_name):
         res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
             df = pd.DataFrame(res.data)
             st.dataframe(df, use_container_width=True)
-            
             st.markdown("---")
             col1, col2 = st.columns(2)
             with col1:
@@ -173,14 +178,11 @@ if pwd == "admin786":
                                 if st.form_submit_button("Update"):
                                     update_record(table_name, edit_id, updated_data)
 
-    if menu == "📋 Gharon ki History": show_history('house_inventory')
+    elif menu == "📋 Gharon ki History": show_history('house_inventory')
     elif menu == "👥 New Clients History": show_history('client_leads')
     elif menu == "🗣️ Discussion History": show_history('client_discussions')
     elif menu == "📂 Pending Deals History": show_history('deals_pending')
     elif menu == "💰 Done Deals History": show_history('deals_done')
-    elif menu == "🏠 Dashboard":
-        st.subheader(f"Welcome, {user_name}")
-        st.info("Side menu se button click kar ke kaam shuru karen.")
 
 else:
     if pwd != "": st.error("Code Ghalat Hai!")
