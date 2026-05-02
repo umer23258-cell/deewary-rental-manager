@@ -8,13 +8,23 @@ url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- 2. PAGE CONFIG ---
-st.set_page_config(page_title="Deewary Property Manager", layout="wide", page_icon="🏢")
+# --- 2. PAGE CONFIG (Yahan change kiya hai taake sidebar hamesha khuli rahe) ---
+st.set_page_config(
+    page_title="Deewary Property Manager", 
+    layout="wide", 
+    page_icon="🏢",
+    initial_sidebar_state="expanded" # Is se mobile par sidebar khud khulegi
+)
 
 # Mobile Friendly Styling
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    
+    /* Yeh code mobile par sidebar ka arrow button hamesha samne rakhega */
+    .st-emotion-cache-zq5wmm { display: block !important; }
+    .st-emotion-cache-18ni7ve { display: block !important; }
+
     .login-box {
         background-color: #1E1E1E; 
         padding: 25px; 
