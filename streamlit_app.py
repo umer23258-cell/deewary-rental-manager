@@ -3,124 +3,116 @@ import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
 
-# --- CONNECT TO SUPABASE ---
+# --- SUPABASE SETUP ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="Deewary Office Manager", layout="wide", page_icon="📑")
+st.set_page_config(page_title="Deewary Dashboard", layout="wide")
 
-# --- UI STYLE ---
-st.markdown("""
-    <style>
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #f0f2f6; border-radius: 5px; padding: 10px 20px;
-    }
-    .stTabs [aria-selected="true"] { background-color: #FF4B4B !important; color: white !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- LOGIN ---
-st.sidebar.title("🏢 Deewary Office")
-user_name = st.sidebar.selectbox("Kon kaam kar raha hai?", ["Anas", "Sawer Khan", "Tariq Hussain"])
-pin = st.sidebar.text_input("Daftar Code", type="password")
+# --- SIDEBAR CONTROL PANEL ---
+st.sidebar.title("🏢 DEEWARY OFFICE")
+user_name = st.sidebar.selectbox("Staff Name", ["Anas", "Sawer Khan", "Tariq Hussain"])
+pin = st.sidebar.text_input("Access Code", type="password")
 
 if pin == "admin786":
-    # Main Tabs for Entry and History
-    tab_entry, tab_history = st.tabs(["➕ Nayi Entry (Input)", "📜 Purani History (Records)"])
+    st.sidebar.divider()
+    # Dashboard Button
+    if st.sidebar.button("📊 DAILY DASHBOARD"):
+        st.session_state.page = "dashboard"
+    
+    st.sidebar.subheader("➕ NAYI ENTRY")
+    if st.sidebar.button("🏠 Ghar ki Entry"): st.session_state.page = "add_house"
+    if st.sidebar.button("👤 Client ki Entry"): st.session_state.page = "add_client"
+    if st.sidebar.button("⏳ Deal Pending"): st.session_state.page = "add_pending"
+    if st.sidebar.button("✅ Deal Done"): st.session_state.page = "add_done"
 
-    # --- SECTION 1: NAYI ENTRY ---
-    with tab_entry:
-        entry_mode = st.radio("Kya Enter Karna Hai?", ["Ghar", "Client", "Pending Deal", "Done Deal"], horizontal=True)
+    st.sidebar.subheader("📜 HISTORY")
+    if st.sidebar.button("📋 Gharon ki List"): st.session_state.page = "hist_house"
+    if st.sidebar.button("👥 Clients ki List"): st.session_state.page = "hist_client"
+
+    # --- MAIN AREA ---
+    page = st.session_state.get('page', 'dashboard')
+
+    if page == "dashboard":
+        st.title("📊 Daily Business Overview")
         
-        if entry_mode == "Ghar":
-            with st.form("h_form"):
-                st.subheader("🏡 Ghar/Shop ki Detail")
-                col1, col2 = st.columns(2)
-                with col1:
-                    o_name = st.text_input("Owner Name")
-                    o_contact = st.text_input("Contact")
-                    floor = st.text_input("Floor")
-                with col2:
-                    marla = st.text_input("Marla")
-                    rent = st.number_input("Rent", min_value=0)
-                    visit = st.text_input("Visit Time")
-                
-                details = f"Gas: {st.checkbox('Gas')} | Water: {st.checkbox('Water')} | Elec: {st.checkbox('Electricity')}"
-                
-                if st.form_submit_button("Save House"):
-                    supabase.table('house_inventory').insert({
-                        "owner_name": o_name, "contact_number": o_contact, "floor": floor,
-                        "marla": marla, "rent": rent, "visit_time": visit, "details": details, "added_by": user_name
-                    }).execute()
-                    st.success("Ghar ki entry ho gayi!")
+        # Data Fetching for Dashboard
+        h_data = supabase.table('house_inventory').select("*").execute()
+        c_data = supabase.table('client_leads').select("*").execute()
+        p_data = supabase.table('deals_pending').select("*").execute()
+        d_data = supabase.table('deals_done').select("*").execute()
 
-        elif entry_mode == "Client":
-            with st.form("c_form"):
-                st.subheader("👤 Client ki Requirement")
-                c_name = st.text_input("Client Name")
-                c_contact = st.text_input("Client Contact")
-                c_budget = st.number_input("Budget", min_value=0)
-                c_area = st.text_input("Area Location")
-                if st.form_submit_button("Save Client"):
-                    supabase.table('client_leads').insert({
-                        "client_name": c_name, "contact_number": c_contact, "budget": c_budget, "preferred_area": c_area, "added_by": user_name
-                    }).execute()
-                    st.success("Client save ho gaya!")
-
-        # Pending and Done deals forms (Same as before but under this tab)
-        # ... [Deals logic remains consistent]
-
-    # --- SECTION 2: HISTORY (ALAG BUTTONS) ---
-    with tab_history:
-        st.subheader("📂 Office Ka Sara Record")
+        # Metrics Columns
+        m1, m2, m3, m4 = st.columns(4)
         
-        # Row of Buttons for History
-        h_col1, h_col2, h_col3, h_col4 = st.columns(4)
+        # Aaj ki date
+        today = datetime.now().strftime("%Y-%m-%d")
         
-        with h_col1:
-            if st.button("🏠 Gharon ki History"):
-                st.session_state.view = "houses"
-        with h_col2:
-            if st.button("👥 Client ki History"):
-                st.session_state.view = "clients"
-        with h_col3:
-            if st.button("⏳ Pending Deals History"):
-                st.session_state.view = "pending"
-        with h_col4:
-            if st.button("✅ Done Deals History"):
-                st.session_state.view = "done"
+        with m1:
+            total_h = len(h_data.data) if h_data.data else 0
+            st.metric("Total Ghar", total_h)
+        with m2:
+            total_c = len(c_data.data) if c_data.data else 0
+            st.metric("Total Clients", total_c)
+        with m3:
+            pending = len(p_data.data) if p_data.data else 0
+            st.metric("Pending Deals", pending, delta_color="normal")
+        with m4:
+            done = len(d_data.data) if d_data.data else 0
+            st.metric("Deals Done ✅", done)
 
         st.divider()
+        
+        col_left, col_right = st.columns(2)
+        
+        with col_left:
+            st.subheader("👨‍💻 Staff Ki Karkardagi (Entries)")
+            if h_data.data:
+                df_h = pd.DataFrame(h_data.data)
+                staff_counts = df_h['added_by'].value_counts()
+                st.bar_chart(staff_counts)
+            else:
+                st.write("Abhi tak koi entry nahi hui.")
 
-        # Display Logic Based on Button Click
-        current_view = st.session_state.get('view', 'houses')
+        with col_right:
+            st.subheader("📅 Aaj Ka Naya Record")
+            # Filtering today's entries
+            if h_data.data:
+                df_today = pd.DataFrame(h_data.data)
+                # Convert created_at to date string for comparison
+                df_today['date'] = pd.to_datetime(df_today['created_at']).dt.strftime('%Y-%m-%d')
+                today_entries = df_today[df_today['date'] == today]
+                
+                if not today_entries.empty:
+                    st.write(f"Aaj {len(today_entries)} naye ghar add huay:")
+                    st.dataframe(today_entries[['owner_name', 'location', 'added_by']], use_container_width=True)
+                else:
+                    st.info("Aaj abhi tak koi naya ghar add nahi hua.")
 
-        if current_view == "houses":
-            st.write("### 🏠 Registered Houses")
-            data = supabase.table('house_inventory').select("*").execute()
-            if data.data:
-                df = pd.DataFrame(data.data)
-                st.dataframe(df.style.highlight_max(axis=0), use_container_width=True)
-            
-        elif current_view == "clients":
-            st.write("### 👥 Client Leads History")
-            data = supabase.table('client_leads').select("*").execute()
-            if data.data:
-                st.dataframe(pd.DataFrame(data.data), use_container_width=True)
+    # --- Baqi Pages (Forms & History) ---
+    elif page == "add_house":
+        st.header("🏠 Naye Ghar ki Entry")
+        # [Wohi purana form jo upar banaya tha]
+        with st.form("h_form"):
+            o_name = st.text_input("Owner Name")
+            o_contact = st.text_input("Contact")
+            floor = st.text_input("Floor")
+            marla = st.text_input("Marla")
+            rent = st.number_input("Rent", min_value=0)
+            if st.form_submit_button("Save"):
+                supabase.table('house_inventory').insert({
+                    "owner_name": o_name, "contact_number": o_contact, "floor": floor, 
+                    "marla": marla, "rent": rent, "added_by": user_name
+                }).execute()
+                st.success("Save ho gaya!")
 
-        elif current_view == "pending":
-            st.write("### ⏳ Pending Deals (Token Received)")
-            data = supabase.table('deals_pending').select("*").execute()
-            if data.data:
-                st.table(pd.DataFrame(data.data))
-
-        elif current_view == "done":
-            st.write("### ✅ Closed Deals (Money Earned)")
-            data = supabase.table('deals_done').select("*").execute()
-            if data.data:
-                st.dataframe(pd.DataFrame(data.data), use_container_width=True)
+    elif page == "hist_house":
+        st.header("📋 Gharon ki List")
+        res = supabase.table('house_inventory').select("*").execute()
+        if res.data:
+            st.dataframe(pd.DataFrame(res.data), use_container_width=True)
 
 else:
-    st.warning("Daftar ka Access Code enter karen.")
+    st.title("🏠 Deewary Office Management System")
+    st.warning("Ghalat Code! Meharbani kar ke sahi code enter karen.")
