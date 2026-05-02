@@ -35,7 +35,7 @@ st.markdown("""
 
 # --- 5. SIDEBAR & MENU ---
 st.sidebar.title("🔐 Staff Access")
-# Anas hata diya, Umer (Manager) add kar diya
+# Manager set to Umer as per instruction
 user_name = st.sidebar.selectbox("Apna Naam Select Karen", ["Umer (Manager)", "Sawer Khan", "Tariq Hussain"])
 pwd = st.sidebar.text_input("Access Code", type="password")
 
@@ -48,7 +48,7 @@ if pwd == "admin786":
     def set_menu(name):
         st.session_state.menu = name
 
-    # Sidebar Buttons
+    # Sidebar Buttons Style
     if st.sidebar.button("🏠 Dashboard", use_container_width=True): set_menu("🏠 Dashboard")
     
     st.sidebar.markdown("### **--- NAYI ENTRY ---**")
@@ -67,45 +67,47 @@ if pwd == "admin786":
 
     menu = st.session_state.menu
 
-    # --- 6. DASHBOARD (MAIN LOGIC) ---
+    # --- 6. DASHBOARD LOGIC ---
     if menu == "🏠 Dashboard":
-        st.subheader(f"📊 Business Overview - Welcome Manager {user_name}")
+        st.subheader(f"📊 Business Overview - Manager: {user_name}")
         
-        # Data Fetching for Stats
-        houses = supabase.table('house_inventory').select("*").execute()
-        clients = supabase.table('client_leads').select("*").execute()
-        deals_done = supabase.table('deals_done').select("*").execute()
-        pending = supabase.table('deals_pending').select("*").execute()
+        # Fetching Stats
+        h_res = supabase.table('house_inventory').select("*").execute()
+        c_res = supabase.table('client_leads').select("*").execute()
+        d_res = supabase.table('deals_done').select("*").execute()
+        p_res = supabase.table('deals_pending').select("*").execute()
 
-        df_h = pd.DataFrame(houses.data)
-        df_c = pd.DataFrame(clients.data)
-        df_d = pd.DataFrame(deals_done.data)
-        df_p = pd.DataFrame(pending.data)
+        df_h = pd.DataFrame(h_res.data) if h_res.data else pd.DataFrame()
+        df_c = pd.DataFrame(c_res.data) if c_res.data else pd.DataFrame()
+        df_d = pd.DataFrame(d_res.data) if d_res.data else pd.DataFrame()
+        df_p = pd.DataFrame(p_res.data) if p_res.data else pd.DataFrame()
 
-        # Dashboard Top Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Houses", len(df_h) if not df_h.empty else 0)
-        m2.metric("Available", len(df_h[df_h['status'] == 'Available']) if not df_h.empty else 0)
-        m3.metric("Rent Out (Done)", len(df_d) if not df_d.empty else 0)
-        m4.metric("Pending Deals", len(df_p) if not df_p.empty else 0)
+        # Top Metric Cards
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Renter Houses", len(df_h))
+        col2.metric("Available", len(df_h[df_h['status'] == 'Available']) if not df_h.empty else 0)
+        col3.metric("Deals Pending", len(df_p))
+        col4.metric("Deals Done", len(df_d))
 
         st.markdown("---")
+        st.subheader("📅 Daily Progress")
+        prog1, prog2 = st.columns(2)
         
-        # Daily Progress Section
-        st.subheader("📅 Daily Progress (Current Status)")
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.markdown("### 🏠 Recent Properties")
+        with prog1:
+            st.write("### 🏠 Recent Houses Added")
             if not df_h.empty:
-                st.dataframe(df_h[['owner_name', 'location', 'rent', 'status']].head(5), use_container_width=True)
-        
-        with c2:
-            st.markdown("### 👥 New Clients Today")
-            if not df_c.empty:
-                st.dataframe(df_c[['client_name', 'budget', 'status']].head(5), use_container_width=True)
+                st.dataframe(df_h[['owner_name', 'location', 'rent', 'status']].head(10), use_container_width=True)
+            else:
+                st.info("No houses listed yet.")
 
-    # --- 7. OTHER FORMS (No Change) ---
+        with prog2:
+            st.write("### 👤 New Clients Today")
+            if not df_c.empty:
+                st.dataframe(df_c[['client_name', 'budget', 'req_location', 'status']].head(10), use_container_width=True)
+            else:
+                st.info("No new clients recorded today.")
+
+    # --- 7. ENTRY FORMS ---
     elif menu == "🏠 Ghar ki Entry (Owners)":
         st.subheader("🏡 Naye Ghar ya Shop ki Detail")
         with st.form("house_form", clear_on_submit=True):
@@ -132,7 +134,6 @@ if pwd == "admin786":
                 }).execute()
                 st.success("Ghar save ho gaya!")
 
-    # --- (Baki Saari Entry Forms or History Sections Wese hi hain) ---
     elif menu == "👤 Client ki Entry (New)":
         st.subheader("👨‍👩‍👧‍👦 Client Requirement")
         with st.form("client_form", clear_on_submit=True):
@@ -149,12 +150,46 @@ if pwd == "admin786":
                 supabase.table('client_leads').insert({"client_name": cn, "contact": cc, "req_location": cloc, "budget": cbud, "beds_required": cb, "status": c_stat, "added_by": user_name}).execute()
                 st.success("Client requirement save ho gayi!")
 
-    # [History Function with Edit/Delete]
+    elif menu == "💬 Client in Discussion":
+        st.subheader("💬 Conversations")
+        with st.form("disc_form", clear_on_submit=True):
+            dc = st.text_input("Client Name")
+            dp = st.text_input("Phone Number")
+            ds = st.text_area("Update/Notes")
+            if st.form_submit_button("Save Discussion"):
+                supabase.table('client_discussions').insert({"client_name": dc, "contact": dp, "notes": ds, "agent": user_name}).execute()
+                st.success("Discussion save ho gayi!")
+
+    elif menu == "⏳ Deal Pending Entry":
+        st.subheader("⏳ Pending (Token)")
+        with st.form("pend_form", clear_on_submit=True):
+            pc = st.text_input("Client Name")
+            pp = st.text_area("Property Details")
+            pt = st.number_input("Token Amount", min_value=0)
+            pd_date = st.date_input("Closing Date")
+            if st.form_submit_button("Save Pending"):
+                supabase.table('deals_pending').insert({"client_name": pc, "property_details": pp, "token_amount": pt, "expected_date": str(pd_date), "agent_name": user_name}).execute()
+                st.success("Pending record save!")
+
+    elif menu == "✅ Deal Done Entry":
+        st.subheader("✅ Deal Done")
+        with st.form("done_form", clear_on_submit=True):
+            dc_n = st.text_input("Client Name")
+            do_n = st.text_input("Owner Name")
+            dp_a = st.text_input("Property Address")
+            dr = st.number_input("Final Rent", min_value=0)
+            dcom = st.number_input("Commission", min_value=0)
+            if st.form_submit_button("Save Done Deal"):
+                supabase.table('deals_done').insert({"client_name": dc_n, "owner_name": do_n, "property_address": dp_a, "final_rent": dr, "commission": dcom, "agent_name": user_name}).execute()
+                st.success("Deal Done save!")
+
+    # --- 8. HISTORY LOGIC (FIXED Syntax from image_a2b4c6.png) ---
     def show_history(table_name):
         res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
             df = pd.DataFrame(res.data)
             st.dataframe(df, use_container_width=True)
+            
             st.markdown("---")
             col1, col2 = st.columns(2)
             with col1:
@@ -177,15 +212,23 @@ if pwd == "admin786":
                                             updated_data[k] = st.text_input(f"{k}", value=str(v))
                                 if st.form_submit_button("Update"):
                                     update_record(table_name, edit_id, updated_data)
+        else:
+            st.info("No records found.")
 
-    elif menu == "📋 Gharon ki History": show_history('house_inventory')
-    elif menu == "👥 New Clients History": show_history('client_leads')
-    elif menu == "🗣️ Discussion History": show_history('client_discussions')
-    elif menu == "📂 Pending Deals History": show_history('deals_pending')
-    elif menu == "💰 Done Deals History": show_history('deals_done')
+    if menu == "📋 Gharon ki History":
+        show_history('house_inventory')
+    elif menu == "👥 New Clients History":
+        show_history('client_leads')
+    elif menu == "🗣️ Discussion History":
+        show_history('client_discussions')
+    elif menu == "📂 Pending Deals History":
+        show_history('deals_pending')
+    elif menu == "💰 Done Deals History":
+        show_history('deals_done')
 
 else:
-    if pwd != "": st.error("Code Ghalat Hai!")
+    if pwd != "": 
+        st.error("Code Ghalat Hai!")
 
 st.divider()
-st.caption(f"© {datetime.now().year} Deewary.com | System Active")
+st.caption(f"© {datetime.now().year} Deewary.com | System Active | Manager: Umer")
