@@ -9,7 +9,6 @@ key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 # --- 2. PAGE CONFIG ---
-# Sirf yahan 'initial_sidebar_state' add kiya hai taake mobile pe sidebar khula nazar aaye
 st.set_page_config(
     page_title="Deewary Property Manager", 
     layout="wide", 
@@ -17,9 +16,40 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 3. CSS ---
-# Header visibility ko 'hidden' se hata diya taake mobile menu ka button (three lines) nazar aaye
-st.markdown("<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;}</style>", unsafe_allow_html=True)
+# --- 3. CUSTOM CSS FOR MOBILE APP LOOK ---
+st.markdown("""
+    <style>
+    /* Main Menu aur Footer hide karne ke liye */
+    #MainMenu {visibility: hidden;} 
+    footer {visibility: hidden;}
+    header {visibility: visible !important;}
+
+    /* Mobile pe buttons ko bara aur clickable banane ke liye */
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        height: 3em;
+        background-color: #262730;
+        border: 1px solid #FF4B4B;
+        margin-bottom: 5px;
+    }
+
+    /* Sidebar ko mobile par width optimize karne ke liye */
+    [data-testid="stSidebar"] {
+        background-color: #111111;
+    }
+
+    /* Input boxes for mobile */
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+    }
+    
+    /* Metrics ko mobile pe adjust karne ke liye */
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # --- 4. HELPER FUNCTIONS ---
 def delete_record(table_name, record_id):
@@ -34,9 +64,9 @@ def update_record(table_name, record_id, data_dict):
 
 # --- 5. HEADER ---
 st.markdown("""
-    <div style="text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 15px; border: 2px solid #FF4B4B;">
-        <h1 style="color: #FF4B4B; margin: 0; font-family: 'Arial Black';">DEEWARY.COM RENTER PROPERTY MANAGEMENT</h1>
-        <p style="color: white; letter-spacing: 2px;">MANAGER PORTAL - WELCOME UMER</p>
+    <div style="text-align: center; background-color: #1E1E1E; padding: 15px; border-radius: 15px; border: 2px solid #FF4B4B; margin-bottom: 20px;">
+        <h2 style="color: #FF4B4B; margin: 0; font-family: 'Arial Black'; font-size: 1.5rem;">DEEWARY.COM</h2>
+        <p style="color: white; letter-spacing: 1px; font-size: 0.8rem; margin: 0;">MANAGER PORTAL - WELCOME UMER</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -54,7 +84,7 @@ if pwd == "admin786":
     def set_menu(name):
         st.session_state.menu = name
 
-    # Sidebar Buttons Style (Aapka original style)
+    # Sidebar Buttons
     if st.sidebar.button("🏠 Dashboard", use_container_width=True): set_menu("🏠 Dashboard")
     
     st.sidebar.markdown("### **--- NAYI ENTRY ---**")
@@ -73,9 +103,9 @@ if pwd == "admin786":
 
     menu = st.session_state.menu
 
-    # --- 7. DASHBOARD LOGIC (Aapka original logic) ---
+    # --- 7. DASHBOARD LOGIC ---
     if menu == "🏠 Dashboard":
-        st.subheader(f"📊 Business Overview - Manager: {user_name}")
+        st.subheader(f"📊 Overview")
         
         h_res = supabase.table('house_inventory').select("*").execute()
         c_res = supabase.table('client_leads').select("*").execute()
@@ -87,50 +117,40 @@ if pwd == "admin786":
         df_d = pd.DataFrame(d_res.data) if d_res.data else pd.DataFrame()
         df_p = pd.DataFrame(p_res.data) if p_res.data else pd.DataFrame()
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Renter Houses", len(df_h))
+        # Mobile par columns auto-stack ho jayenge
+        col1, col2 = st.columns(2)
+        col1.metric("Houses", len(df_h))
         col2.metric("Available", len(df_h[df_h['status'] == 'Available']) if not df_h.empty else 0)
-        col3.metric("Deals Pending", len(df_p))
-        col4.metric("Deals Done", len(df_d))
+        
+        col3, col4 = st.columns(2)
+        col3.metric("Pending", len(df_p))
+        col4.metric("Done", len(df_d))
 
         st.markdown("---")
-        st.subheader("📅 Daily Progress")
-        prog1, prog2 = st.columns(2)
-        
-        with prog1:
-            st.write("### 🏠 Recent Houses Added")
-            if not df_h.empty:
-                st.dataframe(df_h[['owner_name', 'location', 'rent', 'status']].head(10), use_container_width=True)
-            else:
-                st.info("No houses listed yet.")
+        st.write("### 🏠 Recent Houses")
+        if not df_h.empty:
+            st.dataframe(df_h[['owner_name', 'location', 'rent', 'status']].head(5), use_container_width=True)
+        else:
+            st.info("No houses listed yet.")
 
-        with prog2:
-            st.write("### 👤 New Clients Today")
-            if not df_c.empty:
-                st.dataframe(df_c[['client_name', 'budget', 'req_location', 'status']].head(10), use_container_width=True)
-            else:
-                st.info("No new clients recorded today.")
-
-    # --- 8. ENTRY FORMS (Aapka original logic) ---
+    # --- 8. ENTRY FORMS ---
     elif menu == "🏠 Ghar ki Entry (Owners)":
-        st.subheader("🏡 Naye Ghar ya Shop ki Detail")
+        st.subheader("🏡 Naye Ghar ki Detail")
         with st.form("house_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                o_name = st.text_input("Owner ka Naam")
-                o_contact = st.text_input("Owner Contact")
-                loc = st.text_input("Location / Address")
-                portion = st.selectbox("Portion", ["Full House", "Ground Floor", "First Floor", "Basement", "Shop", "Office"])
-                size = st.text_input("Size (Marla/Kanal)")
-            with c2:
-                beds = st.selectbox("Bedrooms", ["1", "2", "3", "4", "5", "6+", "N/A"])
-                rent = st.number_input("Demand Rent", min_value=0)
-                v_time = st.text_input("Visit Time")
-                h_status = st.selectbox("Ghar ka Status", ["Available", "Rent Out"])
-                gas = st.selectbox("Gas", ["Yes", "No", "Single Meter", "Combine Meter"])
-                water = st.selectbox("Water", ["Water Supply", "Boor", "Yes", "No"])
-                elec = st.selectbox("Electricity", ["Separate Meter", "Combine Meter", "Yes", "No"])
-            if st.form_submit_button("Save House Record"):
+            o_name = st.text_input("Owner ka Naam")
+            o_contact = st.text_input("Owner Contact")
+            loc = st.text_input("Location / Address")
+            portion = st.selectbox("Portion", ["Full House", "Ground Floor", "First Floor", "Basement", "Shop", "Office"])
+            size = st.text_input("Size (Marla/Kanal)")
+            beds = st.selectbox("Bedrooms", ["1", "2", "3", "4", "5", "6+", "N/A"])
+            rent = st.number_input("Demand Rent", min_value=0)
+            v_time = st.text_input("Visit Time")
+            h_status = st.selectbox("Ghar ka Status", ["Available", "Rent Out"])
+            gas = st.selectbox("Gas", ["Yes", "No", "Single Meter", "Combine Meter"])
+            water = st.selectbox("Water", ["Water Supply", "Boor", "Yes", "No"])
+            elec = st.selectbox("Electricity", ["Separate Meter", "Combine Meter", "Yes", "No"])
+            
+            if st.form_submit_button("Save House Record", use_container_width=True):
                 supabase.table('house_inventory').insert({
                     "owner_name": o_name, "contact": o_contact, "location": loc, "portion": portion, 
                     "beds": beds, "rent": rent, "size": size, "gas": gas, "water": water, 
@@ -141,47 +161,48 @@ if pwd == "admin786":
     elif menu == "👤 Client ki Entry (New)":
         st.subheader("👨‍👩‍👧‍👦 Client Requirement")
         with st.form("client_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                cn = st.text_input("Client Name")
-                cc = st.text_input("Contact")
-                cb = st.selectbox("Beds Required", ["1", "2", "3", "4", "5+", "Any"])
-            with c2:
-                cbud = st.number_input("Budget", min_value=0)
-                cloc = st.text_input("Location Required")
-                c_stat = st.selectbox("Ghar Mila?", ["Still Searching", "Got House"])
-            if st.form_submit_button("Save Client"):
-                supabase.table('client_leads').insert({"client_name": cn, "contact": cc, "req_location": cloc, "budget": cbud, "beds_required": cb, "status": c_stat, "added_by": user_name}).execute()
+            cn = st.text_input("Client Name")
+            cc = st.text_input("Contact")
+            cb = st.selectbox("Beds Required", ["1", "2", "3", "4", "5+", "Any"])
+            cbud = st.number_input("Budget", min_value=0)
+            cloc = st.text_input("Location Required")
+            c_stat = st.selectbox("Ghar Mila?", ["Still Searching", "Got House"])
+            
+            if st.form_submit_button("Save Client", use_container_width=True):
+                supabase.table('client_leads').insert({
+                    "client_name": cn, "contact": cc, "req_location": cloc, 
+                    "budget": cbud, "beds_required": cb, "status": c_stat, "added_by": user_name
+                }).execute()
                 st.success("Client requirement save ho gayi!")
 
-    # --- 9. HISTORY LOGIC (Aapka original logic) ---
+    # --- 9. HISTORY LOGIC ---
     def show_history(table_name):
         res = supabase.table(table_name).select("*").order('id', desc=True).execute()
         if res.data:
             df = pd.DataFrame(res.data)
             st.dataframe(df, use_container_width=True)
             st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                del_id = st.number_input(f"Delete ID from {table_name}", min_value=0, step=1, key=f"del_{table_name}")
-                if st.button(f"🗑️ Confirm Delete ID {del_id}", key=f"btn_del_{table_name}"):
-                    delete_record(table_name, del_id)
-            with col2:
-                edit_id = st.number_input(f"Edit ID from {table_name}", min_value=0, step=1, key=f"edit_{table_name}")
-                if edit_id > 0:
-                    rec = next((item for item in res.data if item["id"] == edit_id), None)
-                    if rec:
-                        with st.expander(f"Editing ID: {edit_id}"):
-                            with st.form(f"form_edit_{table_name}_{edit_id}"):
-                                updated_data = {}
-                                for k, v in rec.items():
-                                    if k not in ['id', 'created_at', 'added_by', 'agent', 'agent_name']:
-                                        if isinstance(v, int):
-                                            updated_data[k] = st.number_input(f"{k}", value=v)
-                                        else:
-                                            updated_data[k] = st.text_input(f"{k}", value=str(v))
-                                if st.form_submit_button("Update"):
-                                    update_record(table_name, edit_id, updated_data)
+            
+            del_id = st.number_input(f"Delete ID", min_value=0, step=1, key=f"del_{table_name}")
+            if st.button(f"🗑️ Confirm Delete", key=f"btn_del_{table_name}", use_container_width=True):
+                delete_record(table_name, del_id)
+                
+            st.markdown("### Edit Record")
+            edit_id = st.number_input(f"Edit ID", min_value=0, step=1, key=f"edit_{table_name}")
+            if edit_id > 0:
+                rec = next((item for item in res.data if item["id"] == edit_id), None)
+                if rec:
+                    with st.expander(f"Editing ID: {edit_id}"):
+                        with st.form(f"form_edit_{table_name}_{edit_id}"):
+                            updated_data = {}
+                            for k, v in rec.items():
+                                if k not in ['id', 'created_at', 'added_by', 'agent', 'agent_name']:
+                                    if isinstance(v, int):
+                                        updated_data[k] = st.number_input(f"{k}", value=v)
+                                    else:
+                                        updated_data[k] = st.text_input(f"{k}", value=str(v))
+                            if st.form_submit_button("Update", use_container_width=True):
+                                update_record(table_name, edit_id, updated_data)
         else:
             st.info("No records found.")
 
@@ -191,9 +212,9 @@ if pwd == "admin786":
         show_history('client_leads')
     elif menu == "🗣️ Discussion History":
         show_history('client_discussions')
-    elif menu == "📂 Pending Deals History":
+    elif menu == "📂 Pending History":
         show_history('deals_pending')
-    elif menu == "💰 Done Deals History":
+    elif menu == "💰 Done History":
         show_history('deals_done')
 
 else:
