@@ -1,128 +1,115 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
+import plotly.express as px
+from datetime import datetime
 
-# --- 1. SETUP ---
-st.set_page_config(page_title="Real Estate Hub CRM", layout="wide", initial_sidebar_state="expanded")
+# --- 1. ENTERPRISE CONNECTION ---
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
 
-# --- 2. THE DESIGN (CSS for Dark Theme & Layout) ---
+st.set_page_config(page_title="Deewary OS | Black Edition", layout="wide", initial_sidebar_state="collapsed")
+
+# --- 2. ADVANCED NEON-GLASS CSS ---
 st.markdown("""
     <style>
-    .main { background-color: #0E1117; }
+    /* Full Page Gradient */
+    .stApp { background: #050505; color: #E0E0E0; }
     
-    /* Top Metric Cards */
-    .metric-card {
-        background-color: #1E2130;
+    /* Neon Metric Cards */
+    .metric-container {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 16px;
         padding: 20px;
-        border-radius: 10px;
-        border-top: 5px solid #00D1FF;
-        color: white;
-        text-align: left;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
     }
+    .neon-blue { border-left: 4px solid #00D1FF; box-shadow: -5px 0 15px rgba(0, 209, 255, 0.1); }
+    .neon-green { border-left: 4px solid #00FFA3; box-shadow: -5px 0 15px rgba(0, 255, 163, 0.1); }
+    .neon-orange { border-left: 4px solid #FFB800; box-shadow: -5px 0 15px rgba(255, 184, 0, 0.1); }
     
-    /* Property Card */
-    .prop-card {
-        background-color: #1E2130;
-        border-radius: 12px;
-        padding: 10px;
-        margin-bottom: 10px;
-        border: 1px solid #333;
-    }
-    .prop-img {
-        width: 100%;
+    /* Custom Button Glow */
+    .stButton>button {
+        background: transparent;
+        color: #FF4B4B;
+        border: 1px solid #FF4B4B;
         border-radius: 8px;
-        height: 150px;
-        object-fit: cover;
+        transition: 0.3s;
     }
-    
-    /* Deal Pipeline Column */
-    .pipeline-col {
-        background-color: #161925;
-        padding: 15px;
-        border-radius: 10px;
-        min-height: 400px;
+    .stButton>button:hover {
+        background: #FF4B4B;
+        color: white;
+        box-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
     }
-    
-    /* Sidebar styling */
-    [data-testid="stSidebar"] { background-color: #11141D; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. SIDEBAR NAVIGATION ---
-with st.sidebar:
-    st.title("🏗️ RealEstate Hub")
-    st.caption("CRM - Islamabad")
-    st.divider()
-    menu = st.radio("MAIN MENU", ["📊 Dashboard", "➕ Add Property", "👥 Client CRM", "🔄 Deal Pipeline", "📈 Staff Performance"])
+# --- 3. STATE LOGIC ---
+if "active_tab" not in st.session_state: st.session_state.active_tab = "Dashboard"
 
-# --- 4. DASHBOARD (The Image Layout) ---
-if menu == "📊 Dashboard":
-    st.write(f"### Welcome, Admin ID: #001")
-    
-    # ROW 1: METRICS
-    m1, m2, m3, m4 = st.columns(4)
-    m1.markdown('<div class="metric-card" style="border-color: #00D1FF;"><h4>TOTAL LISTINGS</h4><h2>125 <span style="color:#00FF00; font-size:15px;">+5</span></h2></div>', unsafe_allow_html=True)
-    m2.markdown('<div class="metric-card" style="border-color: #00FFA3;"><h4>ACTIVE LEADS</h4><h2>42</h2></div>', unsafe_allow_html=True)
-    m3.markdown('<div class="metric-card" style="border-color: #FFB800;"><h4>PENDING VISITS</h4><h2>18</h2></div>', unsafe_allow_html=True)
-    m4.markdown('<div class="metric-card" style="border-color: #FF4B4B;"><h4>CLOSED DEALS</h4><h2>9</h2></div>', unsafe_allow_html=True)
-    
+# --- 4. TOP NAV BAR (THE LEVEL LOOK) ---
+st.markdown(f"""
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0px; border-bottom: 1px solid #333;">
+        <h2 style="margin:0; color:#FF4B4B;">DEEWARY.COM <span style="font-size:12px; color:#888;">PRO OS v4.0</span></h2>
+        <div style="color:#aaa;">Active Manager: <b style="color:white;">ANAS</b> | Status: <span style="color:#00FF00;">● Online</span></div>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- 5. DASHBOARD LAYOUT ---
+def render_dashboard():
+    # Metrics Row
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown('<div class="metric-container neon-blue"><h4>Total Units</h4><h1 style="margin:0;">125</h1><small style="color:#00FF00;">↑ 12% vs Last Month</small></div>', unsafe_allow_html=True)
+    with c2: st.markdown('<div class="metric-container neon-green"><h4>Leads</h4><h1 style="margin:0;">42</h1><small style="color:#00FF00;">↑ 5% New</small></div>', unsafe_allow_html=True)
+    with c3: st.markdown('<div class="metric-container neon-orange"><h4>Pending</h4><h1 style="margin:0;">18</h1><small style="color:#FFB800;">Requires Follow-up</small></div>', unsafe_allow_html=True)
+    with c4: st.markdown('<div class="metric-container" style="border-left: 4px solid #FF4B4B;"><h4>Closed</h4><h1 style="margin:0;">09</h1><small style="color:#FF4B4B;">Target: 15</small></div>', unsafe_allow_html=True)
+
     st.write("##")
 
-    # ROW 2: PROPERTIES & PIPELINE
-    col_left, col_right = st.columns([1.5, 1])
-    
-    with col_left:
-        st.subheader("PROPERTIES & INVENTORY")
-        # Property Cards Grid
-        p_col1, p_col2, p_col3 = st.columns(3)
+    # Main Grid
+    col_main, col_side = st.columns([2, 1])
+
+    with col_main:
+        st.subheader("🏙️ Inventory Control & Virtual Tours")
+        # Advance Filter Tabs
+        f1, f2, f3 = st.tabs(["All Units", "Available Only", "Rented Out"])
         
-        # Example Card 1
-        with p_col1:
+        with f1:
+            # Code to fetch from house_inventory
             st.markdown("""
-                <div class="prop-card">
-                    <img src="https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=500" class="prop-img">
-                    <p style="font-size:12px; margin-top:5px;"><b>UNIT 102 - F-11 - PKR 75,000/mo</b><br><span style="color:#00FF00;">Available</span></p>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="metric-container">
+                        <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400" style="width:100%; border-radius:10px;">
+                        <h4>DHA Phase 6 - Villa</h4>
+                        <p>Rent: 120k | Owner: Tariq</p>
+                        <button style="width:100%; padding:10px; border-radius:5px; background:#FF4B4B; border:none; color:white;">Quick Edit</button>
+                    </div>
+                    <div class="metric-container">
+                        <img src="https://images.unsplash.com/photo-1600607687940-4e524cb35797?w=400" style="width:100%; border-radius:10px;">
+                        <h4>F-11 Apartment</h4>
+                        <p>Rent: 85k | Owner: Sawer</p>
+                        <button style="width:100%; padding:10px; border-radius:5px; background:#FF4B4B; border:none; color:white;">Quick Edit</button>
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
-            st.button("View Details", key="v1", use_container_width=True)
-            st.button("Add Visit", key="a1", use_container_width=True)
 
-        with p_col2:
-            st.markdown("""
-                <div class="prop-card">
-                    <img src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=500" class="prop-img">
-                    <p style="font-size:12px; margin-top:5px;"><b>VILLA 305 - DHA II - 6.5 Crore</b><br><span style="color:#00FF00;">Available</span></p>
-                </div>
-            """, unsafe_allow_html=True)
-            st.button("View Details", key="v2", use_container_width=True)
-            st.button("Add Visit", key="a2", use_container_width=True)
+    with col_side:
+        st.subheader("⚡ System Logs & Activity")
+        # User Summary mentions staff association
+        st.write("---")
+        st.caption("Today - 10:45 AM")
+        st.info("Umer added 2 new listings in G-11")
+        st.caption("Today - 09:12 AM")
+        st.success("Sawer Khan closed deal for DHA Villa")
+        
+        st.subheader("📈 Staff Performance")
+        staff_perf = pd.DataFrame({"Name": ["Umer", "Sawer", "Tariq"], "Deals": [12, 18, 15]})
+        st.plotly_chart(px.bar(staff_perf, x="Name", y="Deals", color="Name", template="plotly_dark"), use_container_width=True)
 
-    with col_right:
-        st.subheader("DEAL PIPELINE & STATUS")
-        pipe_tabs = st.tabs(["Interested", "Scheduled", "Negotiation", "Closed"])
-        with pipe_tabs[0]:
-            st.info("Asif | DHA II - Villa 305")
-            st.info("Amna | F-11 - Unit 102")
+# Navigation Logic
+if st.session_state.active_tab == "Dashboard":
+    render_dashboard()
 
-    # ROW 3: VISITS & STAFF PERFORMANCE
-    st.write("##")
-    col_v, col_s = st.columns([1.5, 1])
-    
-    with col_v:
-        st.subheader("RECENT VISITS & ACTIVITY")
-        # Dummy Visit Data
-        visit_data = {
-            "Client Name": ["Anna", "Ali", "Amna"],
-            "Property": ["F-11", "DHA II", "G-11"],
-            "Staff": ["Admin", "Umer", "Sawer"],
-            "Status": ["Visiting", "Done", "Pending"]
-        }
-        st.table(pd.DataFrame(visit_data))
-
-    with col_s:
-        st.subheader("STAFF LEADERBOARD")
-        # Bar Chart for Staff
-        st.bar_chart({"Admin": 23, "Amna": 15, "Umer": 10, "Sawer": 5})
-
-# --- 5. FOOTER ---
-st.markdown("<hr><center><small>Powered by Streamlit | Data: Supabase | © 2026 Deewary.com</small></center>", unsafe_allow_html=True)
+# Footer
+st.markdown("<br><hr><center>DEEWARY.COM CLOUD OS | 2026 Edition</center>", unsafe_allow_html=True)
