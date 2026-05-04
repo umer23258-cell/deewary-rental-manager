@@ -2,181 +2,155 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-import plotly.express as px  # Professional charts ke liye
+import plotly.graph_objects as go
+import plotly.express as px
 
-# --- 1. SUPABASE SETUP ---
-# Database connection directly secrets se uthayi jayegi
+# --- 1. CONFIG & CONNECTION ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-# --- 2. PAGE CONFIG ---
-st.set_page_config(
-    page_title="Deewary Pro Manager", 
-    layout="wide", 
-    page_icon="🏢",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Deewary Pro Suite", layout="wide", page_icon="🏗️")
 
-# --- 3. EXTRA LEVEL CUSTOM CSS ---
+# --- 2. THE "LEVEL" UI (CUSTOM CSS) ---
 st.markdown("""
     <style>
-    /* Professional Dark Theme & Mobile Optimization */
-    .main { background-color: #0E1117; }
-    #MainMenu {visibility: hidden;} 
-    footer {visibility: hidden;}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
     
-    /* Metric Card Styling */
-    div[data-testid="stMetricValue"] {
-        font-size: 2.2rem !important;
-        font-weight: 700;
-        color: #FF4B4B;
-    }
-    div[data-testid="metric-container"] {
-        background-color: #1E1E1E;
-        border: 1px solid #333;
-        padding: 20px;
-        border-radius: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
+    /* Main Background */
+    .stApp { background: radial-gradient(circle at top right, #1a1a2e, #16213e, #0f3460); }
 
-    /* Sidebar Customization */
-    [data-testid="stSidebar"] {
-        background-color: #111111;
-        border-right: 1px solid #333;
+    /* Glassmorphism Cards */
+    .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        transition: 0.3s;
     }
-    
-    /* WhatsApp Button Style */
-    .wa-btn {
-        background-color: #25D366;
-        color: white;
-        padding: 8px 15px;
-        border-radius: 8px;
-        text-decoration: none;
+    .stat-card:hover { transform: translateY(-5px); border-color: #FF4B4B; }
+
+    /* Status Badges */
+    .badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
         font-weight: bold;
-        display: inline-block;
-        margin-top: 5px;
     }
+    .badge-done { background-color: #2ecc71; color: white; }
+    .badge-pending { background-color: #f1c40f; color: black; }
+    .badge-visiting { background-color: #3498db; color: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. UTILITY FUNCTIONS ---
-def send_whatsapp(number, client_name, msg_type="general"):
-    # Number clean-up for Pakistan
-    clean_num = str(number).replace("+", "").replace("-", "").replace(" ", "")
-    if clean_num.startswith("0"): clean_num = "92" + clean_num[1:]
-    
-    msgs = {
-        "general": f"Assalam o Alaikum {client_name}, Deewary.com se rabta karne ka shukria. Kya main aapki mazeed madad kar sakta hoon?",
-        "done": f"Mubarak ho {client_name}! Aapki deal Deewary.com ke sath finalize ho gayi hai."
-    }
-    return f"https://wa.me/{clean_num}?text={msgs[msg_type].replace(' ', '%20')}"
+# --- 3. STATE MANAGEMENT ---
+if "auth" not in st.session_state: st.session_state.auth = False
 
-# --- 5. LOG-IN SYSTEM ---
-if "auth" not in st.session_state:
-    st.session_state.auth = False
-
+# --- 4. AUTHENTICATION ---
 if not st.session_state.auth:
-    st.markdown("<div style='text-align:center; padding-top:100px;'>", unsafe_allow_html=True)
-    st.title("🏢 DEEWARY MANAGER LOGIN")
-    pwd = st.text_input("Enter Access Code", type="password")
-    if st.button("Access Portal"):
-        if pwd == "admin786":
-            st.session_state.auth = True
-            st.rerun()
-        else:
-            st.error("Ghalat Code!")
-    st.markdown("</div>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.image("https://cdn-icons-png.flaticon.com/512/602/602182.png", width=80)
+        st.title("Deewary Enterprise")
+        access_code = st.text_input("Security Key", type="password")
+        if st.button("Unlock System", use_container_width=True):
+            if access_code == "admin786":
+                st.session_state.auth = True
+                st.rerun()
     st.stop()
 
-# --- 6. SIDEBAR NAVIGATION ---
-st.sidebar.markdown(f"### WELCOME, {st.session_state.get('user', 'UMER')}")
-menu = st.sidebar.radio("MAIN MENU", [
-    "📊 Dashboard", 
-    "🏠 Property Inventory", 
-    "👥 Client CRM", 
-    "⏳ Pending & Done Deals"
-])
-
-# --- 7. MODULE 1: DYNAMIC DASHBOARD ---
-if menu == "📊 Dashboard":
-    st.markdown("<div class='header-box'><h1>REAL-TIME ANALYTICS</h1></div>", unsafe_allow_html=True)
-    
-    # Fetch Data
-    h_data = supabase.table('house_inventory').select("*").execute().data
-    c_data = supabase.table('client_leads').select("*").execute().data
-    d_data = supabase.table('deals_done').select("*").execute().data
-    
-    # Dashboard Metrics
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Houses", len(h_data))
-    m2.metric("Leads", len(c_data))
-    m3.metric("Done Deals", len(d_data))
-    m4.metric("Conversion", f"{round(len(d_data)/len(c_data)*100, 1) if c_data else 0}%")
-
+# --- 5. NAVIGATION (PRO SIDEBAR) ---
+with st.sidebar:
+    st.markdown("### 🏢 DEEWARY.COM")
+    st.caption("v3.0.1 Stable Build")
     st.divider()
+    choice = st.selectbox("Menu", ["🚀 Dashboard", "📋 Inventory", "🤝 Deal Pipeline", "👥 Clients", "⚙️ Settings"])
     
-    # Pro Charts (Plotly)
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("Property Inventory Status")
-        if h_data:
-            df_h = pd.DataFrame(h_data)
-            fig = px.pie(df_h, names='status', hole=.4, color_discrete_sequence=['#FF4B4B', '#25D366'])
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with col_b:
-        st.subheader("Client Growth")
-        if c_data:
-            df_c = pd.DataFrame(c_data)
-            df_c['created_at'] = pd.to_datetime(df_c['created_at'])
-            fig_line = px.line(df_c.groupby(df_c['created_at'].dt.date).count(), y='id', labels={'id':'New Leads'})
-            st.plotly_chart(fig_line, use_container_width=True)
+    st.sidebar.markdown("---")
+    st.sidebar.info("Manager: Anas\nStaff: Sawer, Tariq, Umer")
 
-# --- 8. MODULE 2: INVENTORY ---
-elif menu == "🏠 Property Inventory":
-    st.title("House Inventory Management")
-    
-    tab1, tab2 = st.tabs(["📋 View All", "➕ Add New House"])
-    
-    with tab2:
-        with st.form("new_house"):
-            o_name = st.text_input("Owner Name")
-            loc = st.text_input("Location")
-            rent = st.number_input("Demand Rent", min_value=0)
-            portion = st.selectbox("Portion", ["Full", "Ground", "First", "Basement"])
-            if st.form_submit_button("Save Property"):
-                supabase.table('house_inventory').insert({
-                    "owner_name": o_name, "location": loc, "rent": rent, "portion": portion, "status": "Available"
-                }).execute()
-                st.success("Property Added!")
+# --- 6. CORE LOGIC ---
 
-    with tab1:
-        res = supabase.table('house_inventory').select("*").execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            # Custom styled dataframe
-            st.dataframe(df.style.highlight_max(axis=0, color='#331111'), use_container_width=True)
+# Data Fetcher (Cached for Performance)
+def get_data(table):
+    res = supabase.table(table).select("*").execute()
+    return pd.DataFrame(res.data) if res.data else pd.DataFrame()
 
-# --- 9. MODULE 3: CLIENT CRM ---
-elif menu == "👥 Client CRM":
-    st.title("Client Relationship Manager")
+if choice == "🚀 Dashboard":
+    st.title("Executive Dashboard")
     
-    res = supabase.table('client_leads').select("*").order('id', desc=True).execute()
-    if res.data:
-        for client in res.data:
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color:#1E1E1E; padding:15px; border-radius:10px; border-left: 5px solid #FF4B4B; margin-bottom:10px;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <b>👤 {client['client_name']}</b>
-                        <span style="color:#888;">{client['contact']}</span>
-                    </div>
-                    <p style="font-size:0.9rem; margin-top:5px;">Requirement: {client.get('req_location', 'N/A')} | Budget: {client.get('budget', 0)}</p>
-                    <a href="{send_whatsapp(client['contact'], client['client_name'])}" target="_blank" class="wa-btn">Send WhatsApp Msg</a>
-                </div>
-                """, unsafe_allow_html=True)
+    # Load Data
+    df_h = get_data('house_inventory')
+    df_c = get_data('client_leads')
+    df_d = get_data('deals_done')
+    
+    # Metrics Row
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown(f"<div class='stat-card'><h3>Houses</h3><h2>{len(df_h)}</h2></div>", unsafe_allow_html=True)
+    with c2: st.markdown(f"<div class='stat-card'><h3>Active Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
+    with c3: st.markdown(f"<div class='stat-card'><h3>Deals Done</h3><h2>{len(df_d)}</h2></div>", unsafe_allow_html=True)
+    with c4: 
+        revenue = df_d['rent'].sum() if not df_d.empty else 0
+        st.markdown(f"<div class='stat-card'><h3>Revenue</h3><h2>{revenue:,.0f}</h2></div>", unsafe_allow_html=True)
 
-# --- FOOTER ---
-st.sidebar.divider()
-st.sidebar.caption(f"© {datetime.now().year} Deewary.com | V2.0 Pro Edition")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Graphs Row
+    col_left, col_right = st.columns([2, 1])
+    with col_left:
+        st.subheader("Monthly Performance")
+        fig = px.area(df_d, x="created_at", y="rent", color_discrete_sequence=['#FF4B4B'])
+        fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col_right:
+        st.subheader("Inventory Split")
+        if not df_h.empty:
+            fig_pie = px.sunburst(df_h, path=['status', 'portion'], values='rent')
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+elif choice == "🤝 Deal Pipeline":
+    st.title("Deal Management Pipeline")
+    st.caption("Visiting se Done Deal tak ka safar track karen")
+
+    # Kanban Style Columns
+    k1, k2, k3 = st.columns(3)
+    
+    with k1:
+        st.markdown("### 🔵 Visiting")
+        # Logic to fetch only 'Visiting' status clients
+        st.warning("Client: Ali | House: E-11")
+        
+    with k2:
+        st.markdown("### 🟡 Pending")
+        st.info("Client: Hamza | House: G-13")
+
+    with k3:
+        st.markdown("### 🟢 Done")
+        st.success("Client: Kamran | House: F-10")
+
+elif choice == "📋 Inventory":
+    st.title("Property Repository")
+    
+    # Search Bar
+    search = st.text_input("🔍 Search by Location, Owner or Rent...", "")
+    
+    df_h = get_data('house_inventory')
+    if not df_h.empty:
+        if search:
+            df_h = df_h[df_h.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
+        
+        st.dataframe(df_h, use_container_width=True, hide_index=True)
+    
+    # Action Buttons
+    if st.button("➕ Add New Property"):
+        # Pop up form logic
+        pass
+
+# --- 7. FOOTER ---
+st.divider()
+st.caption(f"Deewary Cloud OS | System Timestamp: {datetime.now().strftime('%H:%M:%S')}")
