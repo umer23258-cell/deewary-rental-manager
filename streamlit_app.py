@@ -1,115 +1,124 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
-import plotly.express as px
 from datetime import datetime
 
-# --- 1. ENTERPRISE CONNECTION ---
+# --- 1. CONNECTION ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="Deewary OS | Black Edition", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Deewary Hub", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. ADVANCED NEON-GLASS CSS ---
+# --- 2. ADVANCED STYLING ---
 st.markdown("""
     <style>
-    /* Full Page Gradient */
-    .stApp { background: #050505; color: #E0E0E0; }
-    
-    /* Neon Metric Cards */
-    .metric-container {
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 16px;
-        padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-    }
-    .neon-blue { border-left: 4px solid #00D1FF; box-shadow: -5px 0 15px rgba(0, 209, 255, 0.1); }
-    .neon-green { border-left: 4px solid #00FFA3; box-shadow: -5px 0 15px rgba(0, 255, 163, 0.1); }
-    .neon-orange { border-left: 4px solid #FFB800; box-shadow: -5px 0 15px rgba(255, 184, 0, 0.1); }
-    
-    /* Custom Button Glow */
-    .stButton>button {
-        background: transparent;
-        color: #FF4B4B;
+    .stApp { background-color: #0E1117; }
+    .action-btn {
+        background-color: #1E2130;
         border: 1px solid #FF4B4B;
-        border-radius: 8px;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        background: #FF4B4B;
         color: white;
-        box-shadow: 0 0 20px rgba(255, 75, 75, 0.4);
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        cursor: pointer;
+        font-weight: bold;
     }
+    .action-btn:hover { background-color: #FF4B4B; color: white; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. STATE LOGIC ---
-if "active_tab" not in st.session_state: st.session_state.active_tab = "Dashboard"
+# --- 3. DYNAMIC MODAL FUNCTIONS (Entry Logic) ---
+def save_data(table, data):
+    supabase.table(table).insert(data).execute()
+    st.success(f"{table.replace('_', ' ').title()} Entry Saved!")
 
-# --- 4. TOP NAV BAR (THE LEVEL LOOK) ---
-st.markdown(f"""
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0px; border-bottom: 1px solid #333;">
-        <h2 style="margin:0; color:#FF4B4B;">DEEWARY.COM <span style="font-size:12px; color:#888;">PRO OS v4.0</span></h2>
-        <div style="color:#aaa;">Active Manager: <b style="color:white;">ANAS</b> | Status: <span style="color:#00FF00;">● Online</span></div>
-    </div>
-""", unsafe_allow_html=True)
+# --- 4. TOP BAR ACTIONS (Entry Buttons) ---
+st.markdown("<h2 style='color:white;'>DEEWARY ACTION CENTER</h2>", unsafe_allow_html=True)
+col_a, col_b, col_c, col_d, col_e = st.columns(5)
 
-# --- 5. DASHBOARD LAYOUT ---
-def render_dashboard():
-    # Metrics Row
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown('<div class="metric-container neon-blue"><h4>Total Units</h4><h1 style="margin:0;">125</h1><small style="color:#00FF00;">↑ 12% vs Last Month</small></div>', unsafe_allow_html=True)
-    with c2: st.markdown('<div class="metric-container neon-green"><h4>Leads</h4><h1 style="margin:0;">42</h1><small style="color:#00FF00;">↑ 5% New</small></div>', unsafe_allow_html=True)
-    with c3: st.markdown('<div class="metric-container neon-orange"><h4>Pending</h4><h1 style="margin:0;">18</h1><small style="color:#FFB800;">Requires Follow-up</small></div>', unsafe_allow_html=True)
-    with c4: st.markdown('<div class="metric-container" style="border-left: 4px solid #FF4B4B;"><h4>Closed</h4><h1 style="margin:0;">09</h1><small style="color:#FF4B4B;">Target: 15</small></div>', unsafe_allow_html=True)
+with col_a:
+    if st.button("➕ Naya Ghar"): st.session_state.entry_mode = "house"
+with col_b:
+    if st.button("👥 Naya Client"): st.session_state.entry_mode = "client"
+with col_c:
+    if st.button("🚗 Visit Plan"): st.session_state.entry_mode = "visit"
+with col_d:
+    if st.button("⏳ Deal Pending"): st.session_state.entry_mode = "pending"
+with col_e:
+    if st.button("✅ Deal Done"): st.session_state.entry_mode = "done"
 
-    st.write("##")
+st.divider()
 
-    # Main Grid
-    col_main, col_side = st.columns([2, 1])
-
-    with col_main:
-        st.subheader("🏙️ Inventory Control & Virtual Tours")
-        # Advance Filter Tabs
-        f1, f2, f3 = st.tabs(["All Units", "Available Only", "Rented Out"])
+# --- 5. ENTRY FORMS (Pop-up Style Logic) ---
+if "entry_mode" in st.session_state:
+    mode = st.session_state.entry_mode
+    
+    with st.expander(f"📝 {mode.upper()} ENTRY FORM", expanded=True):
+        if mode == "house":
+            with st.form("house_form"):
+                o_name = st.text_input("Owner Name")
+                loc = st.text_input("Location")
+                rent = st.number_input("Rent", min_value=0)
+                if st.form_submit_button("Save Property"):
+                    save_data('house_inventory', {"owner_name": o_name, "location": loc, "rent": rent, "status": "Available"})
         
-        with f1:
-            # Code to fetch from house_inventory
-            st.markdown("""
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="metric-container">
-                        <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400" style="width:100%; border-radius:10px;">
-                        <h4>DHA Phase 6 - Villa</h4>
-                        <p>Rent: 120k | Owner: Tariq</p>
-                        <button style="width:100%; padding:10px; border-radius:5px; background:#FF4B4B; border:none; color:white;">Quick Edit</button>
-                    </div>
-                    <div class="metric-container">
-                        <img src="https://images.unsplash.com/photo-1600607687940-4e524cb35797?w=400" style="width:100%; border-radius:10px;">
-                        <h4>F-11 Apartment</h4>
-                        <p>Rent: 85k | Owner: Sawer</p>
-                        <button style="width:100%; padding:10px; border-radius:5px; background:#FF4B4B; border:none; color:white;">Quick Edit</button>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
+        elif mode == "client":
+            with st.form("client_form"):
+                c_name = st.text_input("Client Name")
+                contact = st.text_input("Contact Number")
+                req = st.text_area("Requirement Details")
+                if st.form_submit_button("Save Client"):
+                    save_data('client_leads', {"client_name": c_name, "contact": contact, "req_location": req})
 
-    with col_side:
-        st.subheader("⚡ System Logs & Activity")
-        # User Summary mentions staff association
-        st.write("---")
-        st.caption("Today - 10:45 AM")
-        st.info("Umer added 2 new listings in G-11")
-        st.caption("Today - 09:12 AM")
-        st.success("Sawer Khan closed deal for DHA Villa")
+        elif mode == "visit":
+            with st.form("visit_form"):
+                c_id = st.text_input("Client ID / Name")
+                h_id = st.text_input("Property ID / Name")
+                v_date = st.date_input("Visit Date")
+                if st.form_submit_button("Schedule Visit"):
+                    # Custom logic for visits table
+                    st.info("Visit Scheduled!")
+
+        elif mode == "pending" or mode == "done":
+            with st.form("deal_form"):
+                deal_client = st.text_input("Client Name")
+                deal_amount = st.number_input("Final Amount", min_value=0)
+                status = "Done Deal" if mode == "done" else "Pending"
+                if st.form_submit_button("Submit Deal Status"):
+                    # Custom logic for deals table
+                    st.success(f"Deal marked as {status}")
         
-        st.subheader("📈 Staff Performance")
-        staff_perf = pd.DataFrame({"Name": ["Umer", "Sawer", "Tariq"], "Deals": [12, 18, 15]})
-        st.plotly_chart(px.bar(staff_perf, x="Name", y="Deals", color="Name", template="plotly_dark"), use_container_width=True)
+        if st.button("❌ Close Form"):
+            del st.session_state.entry_mode
+            st.rerun()
 
-# Navigation Logic
-if st.session_state.active_tab == "Dashboard":
-    render_dashboard()
+# --- 6. DASHBOARD PREVIEW (The Layout you Liked) ---
+st.write("### 📊 Live Dashboard")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Houses", "125", "+5")
+m2.metric("Active Leads", "42", "New")
+m3.metric("Visits Today", "8", "Action Required")
+m4.metric("Revenue", "PKR 450k", "+12%")
 
-# Footer
-st.markdown("<br><hr><center>DEEWARY.COM CLOUD OS | 2026 Edition</center>", unsafe_allow_html=True)
+# Row 2: Property Cards & Pipeline
+col_left, col_right = st.columns([1.5, 1])
+
+with col_left:
+    st.subheader("🏠 Inventory Preview")
+    # Show last 4 properties in professional cards
+    st.markdown("""
+        <div style="display: flex; gap: 10px;">
+            <div class="action-btn" style="flex:1;">Unit 102 - F-11<br>75k/mo</div>
+            <div class="action-btn" style="flex:1;">Villa 305 - DHA<br>6.5 Cr</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_right:
+    st.subheader("🔄 Pipeline")
+    st.write("Recent Activity Log...")
+    st.caption("Umer: Visit Done for DHA Villa")
+    st.caption("Tariq: New Lead Added - G-11")
+
+st.divider()
+st.caption("Deewary.com | Manager: Anas | Staff: Sawer Khan, Tariq Hussain, Umer")
