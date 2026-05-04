@@ -2,92 +2,107 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 
-# Page Config
-st.set_page_config(page_title="Deewary Property Manager", layout="wide")
+# Page Configuration for Wide Look
+st.set_page_config(page_title="RealEstate Hub CRM", layout="wide", initial_sidebar_state="expanded")
 
-# Supabase Setup (Apni details secrets.toml mein dalein)
+# CSS for styling like the image (Dark Theme & Cards)
+st.markdown("""
+    <style>
+    .main { background-color: #12141d; }
+    .metric-card {
+        background-color: #1e2130;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #00d1b2;
+    }
+    .prop-card {
+        background-color: #262936;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Supabase Connection
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase = create_client(url, key)
 
-# Sidebar Navigation
-st.sidebar.title("🏢 Deewary CRM")
-staff_id = st.sidebar.text_input("Enter Staff ID", value="STAFF01")
-menu = ["Dashboard", "Add Property", "Client Visits", "Staff Performance"]
-choice = st.sidebar.selectbox("Menu", menu)
+# --- SIDEBAR ---
+with st.sidebar:
+    st.title("🏠 RealEstate Hub")
+    st.caption("CRM - Islamabad")
+    menu = st.radio("Navigation", ["📊 Dashboard", "➕ Add Property", "👥 Client CRM", "🔄 Deal Pipeline", "📈 Staff Performance"])
 
-# --- 1. DASHBOARD VIEW ---
-if choice == "Dashboard":
-    st.title("Property Dashboard")
-    
-    # Metrics fetch karna
-    props = supabase.table("properties").select("*").execute()
-    deals = supabase.table("deals").select("*").execute()
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Properties", len(props.data))
-    col2.metric("Active Deals", len([d for d in deals.data if d['status'] != 'Closed']))
-    col3.metric("Staff Active", "4")
+# --- DASHBOARD PAGE ---
+if "Dashboard" in menu:
+    st.title("Property Management Overview")
+    st.write("Welcome back, Admin!")
 
-    st.subheader("Recent Listings")
-    df = pd.DataFrame(props.data)
-    if not df.empty:
-        # Display as cards or table
-        st.dataframe(df[['title', 'type', 'price', 'status', 'added_by']], use_container_width=True)
+    # 1. Top Metrics (Colorful Boxes)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown('<div class="metric-card" style="border-left-color: #00bcd4;"><h3>Total Listings</h3><h2>125 <span style="font-size:15px; color:#00ff00;">+5</span></h2></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div class="metric-card" style="border-left-color: #4caf50;"><h3>Active Leads</h3><h2>42</h2></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="metric-card" style="border-left-color: #ff9800;"><h3>Pending Visits</h3><h2>18</h2></div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown('<div class="metric-card" style="border-left-color: #f44336;"><h3>Closed Deals</h3><h2>9</h2></div>', unsafe_allow_html=True)
 
-# --- 2. ADD PROPERTY ---
-elif choice == "Add Property":
-    st.title("Add New Property")
-    with st.form("prop_form"):
-        title = st.text_input("Property Title (e.g. 5 Marla House)")
-        p_type = st.selectbox("Type", ["Sale", "Rent"])
-        price = st.number_input("Price / Rent")
-        address = st.text_area("Address")
-        submitted = st.form_submit_button("Save Property")
+    st.divider()
+
+    # 2. Main Sections (Properties & Pipeline)
+    left_col, right_col = st.columns([1.2, 1])
+
+    with left_col:
+        st.subheader("🏢 Properties & Inventory")
+        tab1, tab2, tab3 = st.tabs(["All", "Rent", "Sale"])
         
-        if submitted:
-            data = {"title": title, "type": p_type, "price": price, "address": address, "added_by": staff_id}
-            supabase.table("properties").insert(data).execute()
-            st.success("Property Added Successfully!")
+        # Fetching data for cards
+        props = supabase.table("properties").select("*").execute().data
+        
+        # Displaying properties in a grid
+        grid_col1, grid_col2 = st.columns(2)
+        for i, p in enumerate(props):
+            target_col = grid_col1 if i % 2 == 0 else grid_col2
+            with target_col:
+                st.markdown(f"""
+                <div class="prop-card">
+                    <img src="{p['image_url']}" width="100%" style="border-radius:5px;">
+                    <p style="margin-top:10px; font-weight:bold;">{p['title']} - {p['location']}</p>
+                    <p style="color:#00d1b2;">{p['type']} ({p['price_rent']})</p>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"Add Visit for {p['title']}", key=f"btn_{p['id']}"):
+                    st.info(f"Visit scheduled for {p['title']}")
 
-# --- 3. CLIENT VISITS & DEALS ---
-elif choice == "Client Visits":
-    st.title("Manage Client Deals")
+    with right_col:
+        st.subheader("🤝 Deal Pipeline & Status")
+        # Visualizing columns like the image
+        p1, p2 = st.columns(2)
+        with p1:
+            st.info("**Interested Leads**")
+            st.caption("Asif - DHA II")
+            st.caption("Amna - F-11")
+        with p2:
+            st.warning("**Visit Scheduled**")
+            st.caption("Umer - G-11")
+
+    # 3. Bottom Section (Recent Activity & Staff)
+    st.divider()
+    b_col1, b_col2 = st.columns([1.5, 1])
     
-    # Form for new deal/visit
-    with st.expander("➕ Register New Visit/Interest"):
-        with st.form("deal_form"):
-            c_name = st.text_input("Client Name")
-            c_phone = st.text_input("Phone Number")
-            # Properties ki list fetch karna dropdown ke liye
-            props = supabase.table("properties").select("id, title").execute()
-            p_options = {p['title']: p['id'] for p in props.data}
-            selected_p = st.selectbox("Select Property", list(p_options.keys()))
-            status = st.selectbox("Current Status", ["Interested", "Visit Done", "Pending", "Closed"])
-            
-            if st.form_submit_button("Log Deal"):
-                deal_data = {
-                    "client_name": c_name, 
-                    "client_phone": c_phone, 
-                    "property_id": p_options[selected_p],
-                    "status": status,
-                    "staff_id": staff_id
-                }
-                supabase.table("deals").insert(deal_data).execute()
-                st.info("Deal Logged!")
+    with b_col1:
+        st.subheader("📋 Recent Visits & Activity")
+        activity_data = pd.DataFrame([
+            {"Client": "Anas", "Property": "Unit 102", "Staff": "Admin", "Status": "Active"},
+            {"Client": "Tariq", "Property": "Villa 305", "Staff": "Staff-01", "Status": "Pending"}
+        ])
+        st.table(activity_data)
 
-    # Display Pipeline
-    st.subheader("Current Deal Pipeline")
-    deals_data = supabase.table("deals").select("*, properties(title)").execute()
-    if deals_data.data:
-        deals_df = pd.DataFrame(deals_data.data)
-        st.table(deals_df[['client_name', 'status', 'staff_id']])
-
-# --- 4. STAFF PERFORMANCE ---
-elif choice == "Staff Performance":
-    st.title("Staff Leaderboard")
-    # Query to count deals per staff
-    performance = supabase.table("deals").select("staff_id").execute()
-    if performance.data:
-        perf_df = pd.DataFrame(performance.data)
-        st.bar_chart(perf_df['staff_id'].value_counts())
+    with b_col2:
+        st.subheader("📊 Staff Performance")
+        chart_data = pd.DataFrame({"Staff": ["Admin", "Amna", "Umer"], "Deals": [23, 13, 10]})
+        st.bar_chart(chart_data.set_index("Staff"))
