@@ -3,95 +3,168 @@ import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
 
-# --- CONNECTION ---
+# --- 1. CONNECTION SETUP ---
 try:
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
-except:
-    st.error("Supabase Config Missing!")
+except Exception as e:
+    st.error("Supabase connection details missing in Secrets!")
     st.stop()
 
-# --- LUXURY UI ---
-st.set_page_config(page_title="Deewary Pro", layout="wide")
+# --- 2. THEME & UI ---
+st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏠")
+
 st.markdown("""
     <style>
-    .stApp { background: #0F111A; color: #E0E0E0; }
-    .app-header { background: linear-gradient(90deg, #FF4B4B, #822727); padding: 20px; border-radius: 0 0 30px 30px; text-align: center; }
-    .metric-box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 20px; text-align: center; }
-    .house-card { background: #1A1D27; border-radius: 20px; padding: 15px; margin-bottom: 15px; border-bottom: 3px solid #FF4B4B; }
-    .stButton>button { background: linear-gradient(90deg, #FF4B4B, #FF8080); color: white; border-radius: 15px; height: 50px; font-weight: bold; width: 100%; }
+    .stApp { background-color: #05070A; color: #E0E0E0; }
+    [data-testid="stMetric"] { background-color: #1E2130; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 10px; }
+    .metric-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 75, 75, 0.3);
+        padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 10px;
+    }
+    .stButton>button {
+        background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
+        color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%;
+    }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIN ---
-if "auth" not in st.session_state: st.session_state.update({"auth": False, "user": None})
-if not st.session_state.auth:
-    st.markdown("<div class='app-header'><h1>DEEWARY PRO</h1></div>", unsafe_allow_html=True)
-    user = st.selectbox("User", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
-    pin = st.text_input("Pin", type="password")
-    if st.button("Unlock"):
-        if pin in ["admin786", "sawer123", "tariq123"]:
-            st.session_state.update({"auth": True, "user": user})
-            st.rerun()
+# --- 3. LOGIN SYSTEM ---
+if "authenticated" not in st.session_state:
+    st.session_state.update({"authenticated": False, "user_role": None, "user_name": None})
+
+if not st.session_state.authenticated:
+    col1, col2, col3 = st.columns([1,1.5,1])
+    with col2:
+        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🏠 DEEWARY PRO</h1>", unsafe_allow_html=True)
+        user = st.selectbox("Select User", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
+        pwd = st.text_input("Access Key", type="password")
+        if st.button("Unlock System"):
+            if user == "Anas (Admin)" and pwd == "admin786":
+                st.session_state.update({"authenticated": True, "user_role": "admin", "user_name": "Anas"})
+                st.rerun()
+            elif (user == "Sawer Khan" and pwd == "sawer123") or (user == "Tariq Hussain" and pwd == "tariq123"):
+                st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": user})
+                st.rerun()
+            else: st.error("❌ Invalid Access Key!")
     st.stop()
 
-# --- DATA FETCH ---
-def get_data(table):
+# --- 4. DATA LOGIC ---
+def fetch_data(table):
     try:
         res = supabase.table(table).select("*").order('created_at', desc=True).execute()
         return pd.DataFrame(res.data)
     except: return pd.DataFrame()
 
-df_h = get_data('house_inventory')
-df_c = get_data('client_leads')
-df_v = get_data('visit_logs')
+df_h = fetch_data('house_inventory')
+df_c = fetch_data('client_leads')
+df_v = fetch_data('visit_logs')
 
-# --- NAVIGATION ---
-t1, t2, t3 = st.tabs(["📊 Dashboard", "📝 Add Entry", "📂 Records"])
+# --- 5. SIDEBAR ---
+with st.sidebar:
+    st.markdown(f"### Welcome, **{st.session_state.user_name}**")
+    st.caption(f"Access Level: {st.session_state.user_role.upper()}")
+    if st.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
 
-with t1:
-    st.write(f"### Welcome, {st.session_state.user} ✨")
-    m1, m2, m3 = st.columns(3)
+# --- 6. TABS ---
+tab_dash, tab_entry, tab_history = st.tabs(["📊 Dashboard (Stock)", "📝 Add New Entry", "📂 Full History & Edit"])
+
+# --- TAB 1: DASHBOARD (Live Stock Only) ---
+with tab_dash:
+    st.markdown("## Live Operational Overview")
     
-    # SAFETY CHECKS FOR COUNTS
-    h_avail = len(df_h[df_h['status'] == 'Available']) if not df_h.empty and 'status' in df_h.columns else 0
-    c_count = len(df_c) if not df_c.empty else 0
-    v_today = len(df_v[df_v['date'] == str(datetime.now().date())]) if not df_v.empty and 'date' in df_v.columns else 0
+    # Filter only available for main counts
+    avail_df = df_h[df_h['status'] == 'Available'] if not df_h.empty else pd.DataFrame()
+    rented_df = df_h[df_h['status'] == 'Rented'] if not df_h.empty else pd.DataFrame()
+    
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Available</h3><h2>{len(avail_df)}</h2></div>", unsafe_allow_html=True)
+    with c2: st.markdown(f"<div class='metric-card'><h3>👥 Active Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
+    with c3: st.markdown(f"<div class='metric-card'><h3>🚗 Total Visits</h3><h2>{len(df_v)}</h2></div>", unsafe_allow_html=True)
+    with c4:
+        total_rented_val = rented_df['rent'].sum() if not rented_df.empty else 0
+        st.markdown(f"<div class='metric-card'><h3>💰 Monthly Vol</h3><h2>{total_rented_val:,.0f}</h2></div>", unsafe_allow_html=True)
 
-    m1.markdown(f"<div class='metric-box'><h2>{h_avail}</h2><p>Available Homes</p></div>", unsafe_allow_html=True)
-    m2.markdown(f"<div class='metric-box'><h2>{c_count}</h2><p>Active Leads</p></div>", unsafe_allow_html=True)
-    m3.markdown(f"<div class='metric-box'><h2>{v_today}</h2><p>Today's Visits</p></div>", unsafe_allow_html=True)
+    st.divider()
+    st.subheader("📍 Quick Available Stock List")
+    if not avail_df.empty:
+        st.dataframe(avail_df[['owner_name', 'location', 'rent', 'marla', 'beds', 'water', 'added_by']], use_container_width=True)
+    else: st.info("No houses currently available for rent.")
 
-    st.markdown("#### 💎 Live Listings")
-    if not df_h.empty and 'status' in df_h.columns:
-        avail_only = df_h[df_h['status'] == 'Available'].head(10)
-        for _, r in avail_only.iterrows():
-            st.markdown(f"<div class='house-card'><b>📍 {r.get('location','N/A')}</b> | Rs. {r.get('rent',0)}<br><small>{r.get('marla','')} • {r.get('beds',0)} Beds</small></div>", unsafe_allow_html=True)
+# --- TAB 2: ENTRY CENTER ---
+with tab_entry:
+    choice = st.radio("Choose Category:", ["Ghar (Property)", "Gahak (Client)", "Visit Log"], horizontal=True)
+    
+    if choice == "Ghar (Property)":
+        with st.form("h_form", clear_on_submit=True):
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                on = st.text_input("Owner Name"); oc = st.text_input("Owner Contact"); ol = st.text_input("Exact Location")
+            with col_b:
+                ornt = st.number_input("Monthly Rent", min_value=0); om = st.text_input("Marla (Size)")
+                of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"]); ob = st.number_input("Bedrooms", 1, 15)
+            with col_c:
+                ow = st.selectbox("Water", ["Yes", "Boring", "Line Water", "Tanker", "No"])
+                og = st.selectbox("Gas", ["Separate", "Common", "No"])
+                oe = st.selectbox("Electricity", ["Separate", "Sub Meter"])
+            if st.form_submit_button("Save to Inventory"):
+                supabase.table('house_inventory').insert({"owner_name":on,"contact":oc,"location":ol,"rent":ornt,"marla":om,"floor":of,"beds":ob,"water":ow,"gas":og,"electricity":oe,"added_by":st.session_state.user_name}).execute()
+                st.success("Property Registered!"); st.rerun()
 
-with t2:
-    mode = st.radio("Type", ["Property", "Client", "Visit"], horizontal=True)
-    if mode == "Property":
-        with st.form("p_f"):
-            on, ol = st.text_input("Owner"), st.text_input("Location")
-            rn, mr = st.number_input("Rent", 0), st.text_input("Marla")
-            if st.form_submit_button("PUBLISH"):
-                supabase.table('house_inventory').insert({"owner_name":on,"location":ol,"rent":rn,"marla":mr,"status":"Available","added_by":st.session_state.user}).execute()
-                st.success("Published!"); st.rerun()
-    elif mode == "Client":
-        with st.form("c_f"):
-            cn, cb = st.text_input("Client Name"), st.number_input("Budget", 0)
-            if st.form_submit_button("SAVE"):
-                supabase.table('client_leads').insert({"name":cn,"budget":cb,"added_by":st.session_state.user}).execute()
-                st.success("Saved!"); st.rerun()
+    elif choice == "Gahak (Client)":
+        with st.form("c_form", clear_on_submit=True):
+            ca, cb = st.columns(2)
+            with ca:
+                cn = st.text_input("Client Name"); cc = st.text_input("Contact"); cb_val = st.number_input("Budget", min_value=0)
+                cb_beds = st.number_input("Required Beds", 1, 15)
+            with cb:
+                cm = st.text_input("Required Marla"); car = st.text_input("Preferred Area")
+                cp = st.selectbox("Portion Type", ["Any", "Ground", "First", "Full House"])
+            if st.form_submit_button("Save Client Lead"):
+                supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb_val,"beds":cb_beds,"marla":cm,"area":car,"portion":cp,"added_by":st.session_state.user_name}).execute()
+                st.success("Client Requirement Logged!"); st.rerun()
 
-with t3:
-    v = st.selectbox("View", ["Houses", "Visits"])
-    target = 'house_inventory' if v=="Houses" else 'visit_logs'
-    data = get_data(target)
-    if not data.empty:
-        st.dataframe(data, use_container_width=True)
-        mid = st.text_input("ID to Rent/Delete")
-        if mid and st.button("Mark as Rented"):
-            supabase.table(target).update({"status":"Rented"}).eq('id', mid).execute()
-            st.rerun()
+    elif choice == "Visit Log":
+        with st.form("v_form", clear_on_submit=True):
+            vc = st.text_input("Client Name"); vh = st.text_input("Property Visited")
+            vf = st.text_area("Client Feedback/Remarks")
+            if st.form_submit_button("Log Visit"):
+                supabase.table('visit_logs').insert({"client":vc,"house":vh,"staff":st.session_state.user_name,"feedback":vf,"date":str(datetime.now().date())}).execute()
+                st.success("Activity Recorded!"); st.rerun()
+
+# --- TAB 3: HISTORY & ACTIONS ---
+with tab_history:
+    db_target = st.selectbox("Database Table:", ["house_inventory", "client_leads", "visit_logs"])
+    raw_df = fetch_data(db_target)
+    
+    if not raw_df.empty:
+        search_q = st.text_input(f"🔍 Search in {db_target.replace('_', ' ')}...")
+        if search_q:
+            raw_df = raw_df[raw_df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
+        st.dataframe(raw_df, use_container_width=True)
+        
+        st.divider()
+        st.subheader("🛠️ Record Management (Rent Out / Edit / Delete)")
+        rec_id = st.text_input("Enter ID of the record you want to modify:")
+        if rec_id:
+            col_edit, col_del = st.columns(2)
+            with col_edit:
+                new_status = st.selectbox("Change Status:", ["Available", "Rented", "Maintenance", "Pending"])
+                if st.button("Update Record Status"):
+                    supabase.table(db_target).update({"status": new_status}).eq('id', rec_id).execute()
+                    st.success("Status Updated Successfully!"); st.rerun()
+            with col_del:
+                if st.session_state.user_role == "admin":
+                    if st.button("🗑️ Permanent Delete Record"):
+                        supabase.table(db_target).delete().eq('id', rec_id).execute()
+                        st.warning("Record Removed!"); st.rerun()
+                else: st.info("Only Admin can delete records.")
+    else: st.info("No data found in this category.")
+
+st.divider()
+st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v2.7 | Built for Anas | Staff: Sawer & Tariq</p>", unsafe_allow_html=True)
