@@ -3,168 +3,96 @@ import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
 
-# --- 1. CONNECTION SETUP ---
+# --- 1. CONNECTION ---
 try:
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
-except Exception as e:
-    st.error("Supabase connection details missing in Secrets!")
+except:
+    st.error("Connection Error!")
     st.stop()
 
-# --- 2. THEME & UI ---
-st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏠")
+# --- 2. MOBILE-FIRST PREMIUM UI ---
+st.set_page_config(page_title="Deewary OS", layout="wide", page_icon="📱")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #05070A; color: #E0E0E0; }
-    [data-testid="stMetric"] { background-color: #1E2130; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 10px; }
-    .metric-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 75, 75, 0.3);
-        padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 10px;
+    /* Mobile App Look */
+    .stApp { background: #0A0E14; color: #FFFFFF; font-family: 'Inter', sans-serif; }
+    
+    /* Neon Metric Cards */
+    .metric-container {
+        background: linear-gradient(145deg, #161B22, #0D1117);
+        border: 1px solid #30363D;
+        padding: 15px; border-radius: 20px;
+        text-align: center; margin-bottom: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
+    .metric-value { font-size: 24px; font-weight: 800; color: #FF4B4B; }
+    .metric-label { font-size: 12px; color: #8B949E; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* Property Cards for Mobile */
+    .prop-card {
+        background: #1C2128; border-radius: 15px; padding: 15px;
+        margin-bottom: 15px; border-left: 5px solid #FF4B4B;
+    }
+
+    /* Tabs & Buttons */
+    .stTabs [data-baseweb="tab-list"] { display: flex; justify-content: space-around; background: #161B22; border-radius: 50px; padding: 5px; }
+    .stTabs [data-baseweb="tab"] { color: white; border: none !important; }
+    .stTabs [aria-selected="true"] { background: #FF4B4B !important; border-radius: 50px !important; color: white !important; }
+    
     .stButton>button {
-        background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
-        color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%;
+        width: 100%; border-radius: 12px; height: 3em;
+        background: linear-gradient(90deg, #FF4B4B, #D73A49);
+        border: none; font-weight: bold; font-size: 16px;
     }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIN SYSTEM ---
+# --- 3. LOGIN ---
 if "authenticated" not in st.session_state:
     st.session_state.update({"authenticated": False, "user_role": None, "user_name": None})
 
 if not st.session_state.authenticated:
-    col1, col2, col3 = st.columns([1,1.5,1])
-    with col2:
-        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🏠 DEEWARY PRO</h1>", unsafe_allow_html=True)
-        user = st.selectbox("Select User", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
-        pwd = st.text_input("Access Key", type="password")
-        if st.button("Unlock System"):
+    st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center;'>🏢 DEEWARY <span style='color:#FF4B4B'>PRO</span></h1>", unsafe_allow_html=True)
+    with st.container():
+        user = st.selectbox("Who are you?", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
+        pwd = st.text_input("Security Pin", type="password")
+        if st.button("Access Dashboard"):
             if user == "Anas (Admin)" and pwd == "admin786":
                 st.session_state.update({"authenticated": True, "user_role": "admin", "user_name": "Anas"})
                 st.rerun()
             elif (user == "Sawer Khan" and pwd == "sawer123") or (user == "Tariq Hussain" and pwd == "tariq123"):
                 st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": user})
                 st.rerun()
-            else: st.error("❌ Invalid Access Key!")
+            else: st.error("Wrong Pin!")
     st.stop()
 
 # --- 4. DATA LOGIC ---
-def fetch_data(table):
-    try:
-        res = supabase.table(table).select("*").order('created_at', desc=True).execute()
-        return pd.DataFrame(res.data)
-    except: return pd.DataFrame()
+def fetch_all():
+    h = supabase.table('house_inventory').select("*").order('created_at', desc=True).execute()
+    c = supabase.table('client_leads').select("*").order('created_at', desc=True).execute()
+    v = supabase.table('visit_logs').select("*").order('created_at', desc=True).execute()
+    return pd.DataFrame(h.data), pd.DataFrame(c.data), pd.DataFrame(v.data)
 
-df_h = fetch_data('house_inventory')
-df_c = fetch_data('client_leads')
-df_v = fetch_data('visit_logs')
+df_h, df_c, df_v = fetch_all()
 
-# --- 5. SIDEBAR ---
-with st.sidebar:
-    st.markdown(f"### Welcome, **{st.session_state.user_name}**")
-    st.caption(f"Access Level: {st.session_state.user_role.upper()}")
-    if st.button("🚪 Logout"):
-        st.session_state.authenticated = False
-        st.rerun()
+# --- 5. APP NAVIGATION ---
+# Icons ke liye hum simple text ya emojis use kar rahe hain jo mobile par fast load hote hain
+tab1, tab2, tab3 = st.tabs(["🏠 Home", "➕ Add", "📁 Logs"])
 
-# --- 6. TABS ---
-tab_dash, tab_entry, tab_history = st.tabs(["📊 Dashboard (Stock)", "📝 Add New Entry", "📂 Full History & Edit"])
-
-# --- TAB 1: DASHBOARD (Live Stock Only) ---
-with tab_dash:
-    st.markdown("## Live Operational Overview")
+# --- TAB 1: SMART DASHBOARD ---
+with tab1:
+    st.markdown(f"### Hello, {st.session_state.user_name} 👋")
     
-    # Filter only available for main counts
-    avail_df = df_h[df_h['status'] == 'Available'] if not df_h.empty else pd.DataFrame()
-    rented_df = df_h[df_h['status'] == 'Rented'] if not df_h.empty else pd.DataFrame()
-    
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Available</h3><h2>{len(avail_df)}</h2></div>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div class='metric-card'><h3>👥 Active Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
-    with c3: st.markdown(f"<div class='metric-card'><h3>🚗 Total Visits</h3><h2>{len(df_v)}</h2></div>", unsafe_allow_html=True)
-    with c4:
-        total_rented_val = rented_df['rent'].sum() if not rented_df.empty else 0
-        st.markdown(f"<div class='metric-card'><h3>💰 Monthly Vol</h3><h2>{total_rented_val:,.0f}</h2></div>", unsafe_allow_html=True)
+    # Live Daily Snapshot
+    avail = df_h[df_h['status'] == 'Available'] if not df_h.empty else []
+    today_v = df_v[df_v['date'] == str(datetime.now().date())] if not df_v.empty else []
 
-    st.divider()
-    st.subheader("📍 Quick Available Stock List")
-    if not avail_df.empty:
-        st.dataframe(avail_df[['owner_name', 'location', 'rent', 'marla', 'beds', 'water', 'added_by']], use_container_width=True)
-    else: st.info("No houses currently available for rent.")
-
-# --- TAB 2: ENTRY CENTER ---
-with tab_entry:
-    choice = st.radio("Choose Category:", ["Ghar (Property)", "Gahak (Client)", "Visit Log"], horizontal=True)
-    
-    if choice == "Ghar (Property)":
-        with st.form("h_form", clear_on_submit=True):
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                on = st.text_input("Owner Name"); oc = st.text_input("Owner Contact"); ol = st.text_input("Exact Location")
-            with col_b:
-                ornt = st.number_input("Monthly Rent", min_value=0); om = st.text_input("Marla (Size)")
-                of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"]); ob = st.number_input("Bedrooms", 1, 15)
-            with col_c:
-                ow = st.selectbox("Water", ["Yes", "Boring", "Line Water", "Tanker", "No"])
-                og = st.selectbox("Gas", ["Separate", "Common", "No"])
-                oe = st.selectbox("Electricity", ["Separate", "Sub Meter"])
-            if st.form_submit_button("Save to Inventory"):
-                supabase.table('house_inventory').insert({"owner_name":on,"contact":oc,"location":ol,"rent":ornt,"marla":om,"floor":of,"beds":ob,"water":ow,"gas":og,"electricity":oe,"added_by":st.session_state.user_name}).execute()
-                st.success("Property Registered!"); st.rerun()
-
-    elif choice == "Gahak (Client)":
-        with st.form("c_form", clear_on_submit=True):
-            ca, cb = st.columns(2)
-            with ca:
-                cn = st.text_input("Client Name"); cc = st.text_input("Contact"); cb_val = st.number_input("Budget", min_value=0)
-                cb_beds = st.number_input("Required Beds", 1, 15)
-            with cb:
-                cm = st.text_input("Required Marla"); car = st.text_input("Preferred Area")
-                cp = st.selectbox("Portion Type", ["Any", "Ground", "First", "Full House"])
-            if st.form_submit_button("Save Client Lead"):
-                supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb_val,"beds":cb_beds,"marla":cm,"area":car,"portion":cp,"added_by":st.session_state.user_name}).execute()
-                st.success("Client Requirement Logged!"); st.rerun()
-
-    elif choice == "Visit Log":
-        with st.form("v_form", clear_on_submit=True):
-            vc = st.text_input("Client Name"); vh = st.text_input("Property Visited")
-            vf = st.text_area("Client Feedback/Remarks")
-            if st.form_submit_button("Log Visit"):
-                supabase.table('visit_logs').insert({"client":vc,"house":vh,"staff":st.session_state.user_name,"feedback":vf,"date":str(datetime.now().date())}).execute()
-                st.success("Activity Recorded!"); st.rerun()
-
-# --- TAB 3: HISTORY & ACTIONS ---
-with tab_history:
-    db_target = st.selectbox("Database Table:", ["house_inventory", "client_leads", "visit_logs"])
-    raw_df = fetch_data(db_target)
-    
-    if not raw_df.empty:
-        search_q = st.text_input(f"🔍 Search in {db_target.replace('_', ' ')}...")
-        if search_q:
-            raw_df = raw_df[raw_df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-        st.dataframe(raw_df, use_container_width=True)
-        
-        st.divider()
-        st.subheader("🛠️ Record Management (Rent Out / Edit / Delete)")
-        rec_id = st.text_input("Enter ID of the record you want to modify:")
-        if rec_id:
-            col_edit, col_del = st.columns(2)
-            with col_edit:
-                new_status = st.selectbox("Change Status:", ["Available", "Rented", "Maintenance", "Pending"])
-                if st.button("Update Record Status"):
-                    supabase.table(db_target).update({"status": new_status}).eq('id', rec_id).execute()
-                    st.success("Status Updated Successfully!"); st.rerun()
-            with col_del:
-                if st.session_state.user_role == "admin":
-                    if st.button("🗑️ Permanent Delete Record"):
-                        supabase.table(db_target).delete().eq('id', rec_id).execute()
-                        st.warning("Record Removed!"); st.rerun()
-                else: st.info("Only Admin can delete records.")
-    else: st.info("No data found in this category.")
-
-st.divider()
-st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v2.7 | Built for Anas | Staff: Sawer & Tariq</p>", unsafe_allow_html=True)
+    m1, m2 = st.columns(2)
+    with m1:
+        st.markdown(f"<div class='metric-container'><div class='metric-label'>Available</div><div class='metric-value'>{len(avail)}</div></div>", unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"<div class='metric-container'><div class='metric-label'>Visits Today</div>
