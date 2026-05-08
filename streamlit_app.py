@@ -10,10 +10,10 @@ try:
     key = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 except Exception as e:
-    st.error("Supabase Connection Fail! Check your Secrets.")
+    st.error("Supabase Connection Fail! Check Secrets.")
     st.stop()
 
-# --- 2. PAGE CONFIG ---
+# --- 2. PAGE CONFIG & UI STYLE ---
 st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏢")
 
 st.markdown("""
@@ -27,19 +27,19 @@ st.markdown("""
     }
     .stButton>button {
         background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
-        color: white; border: none; border-radius: 8px; width: 100%; font-weight: bold;
+        color: white; border: none; border-radius: 8px; font-weight: bold;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. AUTHENTICATION ---
+# --- 3. LOGIN SYSTEM ---
 if "authenticated" not in st.session_state:
     st.session_state.update({"authenticated": False, "user_role": None, "user_name": None})
 
 if not st.session_state.authenticated:
     col1, col2, col3 = st.columns([1,1.5,1])
     with col2:
-        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>DEEWARY PRO LOGIN</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>DEEWARY PRO</h1>", unsafe_allow_html=True)
         user = st.selectbox("Select User", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
         pwd = st.text_input("Password", type="password")
         if st.button("Unlock"):
@@ -49,16 +49,15 @@ if not st.session_state.authenticated:
             elif (user == "Sawer Khan" and pwd == "sawer123") or (user == "Tariq Hussain" and pwd == "tariq123"):
                 st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": user})
                 st.rerun()
-            else: st.error("Wrong Password!")
+            else: st.error("Access Denied!")
     st.stop()
 
-# --- 4. DATA FETCHING ---
+# --- 4. DATA LOGIC ---
 def fetch_data(table):
     try:
         res = supabase.table(table).select("*").order('created_at', desc=True).execute()
         return pd.DataFrame(res.data)
-    except:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 df_h = fetch_data('house_inventory')
 df_c = fetch_data('client_leads')
@@ -66,15 +65,15 @@ df_v = fetch_data('visit_logs')
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
-    st.markdown(f"### 👤 {st.session_state.user_name}")
+    st.write(f"### 👤 {st.session_state.user_name}")
     if st.button("Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
 # --- 6. TABS ---
-tab_dash, tab_entry, tab_mgmt = st.tabs(["📊 Dashboard", "📝 Nayi Entry", "📂 History & Edit"])
+tab_dash, tab_entry, tab_mgmt = st.tabs(["📊 Dashboard", "📝 Nayi Entry", "📂 Data Management"])
 
-# --- TAB 1: DASHBOARD ---
+# --- DASHBOARD ---
 with tab_dash:
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Houses</h3><h2>{len(df_h)}</h2></div>", unsafe_allow_html=True)
@@ -84,74 +83,80 @@ with tab_dash:
         rev = df_h[df_h['status'] == 'Rented']['rent'].sum() if not df_h.empty and 'status' in df_h.columns else 0
         st.markdown(f"<div class='metric-card'><h3>💰 Volume</h3><h2>{rev:,.0f}</h2></div>", unsafe_allow_html=True)
 
-# --- TAB 2: ENTRY CENTER ---
+# --- ENTRY CENTER ---
 with tab_entry:
-    choice = st.radio("What to add?", ["Property", "Client", "Visit"], horizontal=True)
+    mode = st.radio("Add New:", ["Property (Ghar)", "Client (Gahak)", "Visit Log"], horizontal=True)
     
-    if choice == "Property":
-        with st.form("h_f"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                on = st.text_input("Owner Name")
-                oc = st.text_input("Contact")
-                ol = st.text_input("Location")
-            with c2:
-                ornt = st.number_input("Rent", min_value=0)
-                om = st.text_input("Marla (e.g. 5 Marla)")
-                of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"])
-                obeds = st.number_input("Beds", min_value=1, max_value=15) # ADDED BEDS
-            with c3:
-                ow = st.selectbox("Water", ["Yes", "Boring", "Line"])
-                og = st.selectbox("Gas", ["Separate", "Common", "No"])
-                oe = st.selectbox("Elec", ["Separate", "Sub Meter"])
+    if mode == "Property (Ghar)":
+        with st.form("house_form"):
+            ca, cb, cc = st.columns(3)
+            with ca:
+                o_n = st.text_input("Owner Name")
+                o_c = st.text_input("Contact")
+                o_l = st.text_input("Location")
+            with cb:
+                rnt = st.number_input("Monthly Rent", min_value=0)
+                mrl = st.text_input("Marla (Size)")
+                flr = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"])
+                bed = st.number_input("Bedrooms", 1, 15)
+            with cc:
+                wtr = st.selectbox("Water Status", ["Yes", "Boring", "Line Water", "Tanker", "No"])
+                gas = st.selectbox("Gas Status", ["Separate", "Common", "No"])
+                ele = st.selectbox("Electricity", ["Separate", "Sub Meter"])
             if st.form_submit_button("Save Property"):
-                supabase.table('house_inventory').insert({
-                    "owner_name": on, "contact": oc, "location": ol, "rent": ornt, "marla": om,
-                    "floor": of, "beds": obeds, "water": ow, "gas": og, "electricity": oe, "added_by": st.session_state.user_name
-                }).execute()
-                st.success("Property Saved!")
+                supabase.table('house_inventory').insert({"owner_name":o_n,"contact":o_c,"location":o_l,"rent":rnt,"marla":mrl,"floor":flr,"beds":bed,"water":wtr,"gas":gas,"electricity":ele,"added_by":st.session_state.user_name}).execute()
+                st.success("Ghar Register Ho Gaya!")
                 st.rerun()
 
-    elif choice == "Client":
-        with st.form("c_f"):
-            cc1, cc2 = st.columns(2)
-            with cc1:
+    elif mode == "Client (Gahak)":
+        with st.form("client_form"):
+            c1, c2 = st.columns(2)
+            with c1:
                 cn = st.text_input("Client Name")
-                ccont = st.text_input("Client Contact")
-                cb = st.number_input("Budget", min_value=0)
-                c_beds = st.number_input("Required Beds", min_value=1) # ADDED BEDS
-            with cc2:
-                c_marla = st.text_input("Required Marla") # ADDED MARLA
-                c_area = st.text_input("Preferred Area") # ADDED AREA
-                c_portion = st.selectbox("Portion", ["Any", "Ground", "First", "Full"])
-            
+                cc = st.text_input("Client Contact")
+                cb = st.number_input("Budget Range", min_value=0)
+                cbd = st.number_input("Required Beds", 1, 15)
+            with c2:
+                cm = st.text_input("Required Marla")
+                ca = st.text_input("Preferred Area")
+                cp = st.selectbox("Portion Type", ["Ground", "First", "Full", "Any"])
             if st.form_submit_button("Save Client Lead"):
-                supabase.table('client_leads').insert({
-                    "name": cn, "contact": ccont, "budget": cb, "beds": c_beds, 
-                    "marla": c_marla, "area": c_area, "portion": c_portion, "added_by": st.session_state.user_name
-                }).execute()
-                st.success("Client Requirement Saved!")
+                supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb,"beds":cbd,"marla":cm,"area":ca,"portion":cp,"added_by":st.session_state.user_name}).execute()
+                st.success("Client Record Saved!")
                 st.rerun()
 
-    elif choice == "Visit":
-        with st.form("v_f"):
-            vc = st.text_input("Client Name")
-            vh = st.text_input("House Location")
-            vf = st.text_area("Feedback")
-            if st.form_submit_button("Record Visit"):
-                supabase.table('visit_logs').insert({
-                    "client": vc, "house": vh, "staff": st.session_state.user_name, 
-                    "feedback": vf, "date": str(datetime.now().date())
-                }).execute()
-                st.success("Visit Logged!")
+    elif mode == "Visit Log":
+        with st.form("visit_form"):
+            v_cl = st.text_input("Client Name")
+            v_h = st.text_input("House Address")
+            v_f = st.text_area("Visit Remarks/Feedback")
+            st.info(f"Staff Assigned: {st.session_state.user_name}")
+            if st.form_submit_button("Log Visit"):
+                supabase.table('visit_logs').insert({"client":v_cl,"house":v_h,"staff":st.session_state.user_name,"feedback":v_f,"date":str(datetime.now().date())}).execute()
+                st.success("Visit Activity Recorded!")
                 st.rerun()
 
-# --- TAB 3: HISTORY ---
+# --- MANAGEMENT ---
 with tab_mgmt:
     target = st.selectbox("Select View", ["house_inventory", "client_leads", "visit_logs"])
     df_raw = fetch_data(target)
     if not df_raw.empty:
-        search = st.text_input("🔍 Search History...")
-        if search:
-            df_raw = df_raw[df_raw.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+        # Search & Display
+        q = st.text_input("🔍 Search Anything...")
+        if q: df_raw = df_raw[df_raw.astype(str).apply(lambda x: x.str.contains(q, case=False)).any(axis=1)]
         st.dataframe(df_raw, use_container_width=True)
+        
+        # Modify
+        st.divider()
+        mid = st.text_input("Enter ID to Edit/Delete")
+        if mid:
+            ce, cd = st.columns(2)
+            with ce:
+                ns = st.selectbox("Update Status", ["Available", "Rented", "Pending", "Closed"])
+                if st.button("Apply Status"):
+                    supabase.table(target).update({"status": ns}).eq('id', mid).execute()
+                    st.success("Updated!"); st.rerun()
+            with cd:
+                if st.button("🗑️ Delete Record"):
+                    supabase.table(target).delete().eq('id', mid).execute()
+                    st.warning("Deleted!"); st.rerun()
