@@ -13,7 +13,7 @@ except Exception as e:
     st.error("Supabase Connection Fail! Check your Secrets.")
     st.stop()
 
-# --- 2. PAGE CONFIG & STYLE ---
+# --- 2. PAGE CONFIG ---
 st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏢")
 
 st.markdown("""
@@ -60,7 +60,6 @@ def fetch_data(table):
     except:
         return pd.DataFrame()
 
-# Fetching all data at once
 df_h = fetch_data('house_inventory')
 df_c = fetch_data('client_leads')
 df_v = fetch_data('visit_logs')
@@ -68,43 +67,22 @@ df_v = fetch_data('visit_logs')
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state.user_name}")
-    st.write(f"Role: **{st.session_state.user_role.upper()}**")
     if st.button("Logout"):
         st.session_state.authenticated = False
         st.rerun()
 
-# --- 6. NAVIGATION TABS ---
+# --- 6. TABS ---
 tab_dash, tab_entry, tab_mgmt = st.tabs(["📊 Dashboard", "📝 Nayi Entry", "📂 History & Edit"])
 
 # --- TAB 1: DASHBOARD ---
 with tab_dash:
-    st.markdown("## Operational Overview")
-    
-    # Dashboard Cards with Safety
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Houses</h3><h2>{len(df_h)}</h2></div>", unsafe_allow_html=True)
     with c2: st.markdown(f"<div class='metric-card'><h3>👥 Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
     with c3: st.markdown(f"<div class='metric-card'><h3>🚗 Visits</h3><h2>{len(df_v)}</h2></div>", unsafe_allow_html=True)
     with c4:
-        # Fixed the KeyError by checking column names first
-        if not df_h.empty and 'status' in df_h.columns and 'rent' in df_h.columns:
-            rev = df_h[df_h['status'] == 'Rented']['rent'].sum()
-        else: rev = 0
+        rev = df_h[df_h['status'] == 'Rented']['rent'].sum() if not df_h.empty and 'status' in df_h.columns else 0
         st.markdown(f"<div class='metric-card'><h3>💰 Volume</h3><h2>{rev:,.0f}</h2></div>", unsafe_allow_html=True)
-
-    st.write("##")
-    col_l, col_r = st.columns([2, 1])
-    with col_l:
-        st.subheader("Activity Chart")
-        if not df_v.empty:
-            fig = px.line(df_v, x='date', title="Visits over Time", color_discrete_sequence=['#FF4B4B'])
-            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-            st.plotly_chart(fig, use_container_width=True)
-        else: st.info("No visit data to chart yet.")
-    with col_r:
-        st.subheader("Leaderboard")
-        if not df_v.empty:
-            st.table(df_v['staff'].value_counts())
 
 # --- TAB 2: ENTRY CENTER ---
 with tab_entry:
@@ -119,8 +97,9 @@ with tab_entry:
                 ol = st.text_input("Location")
             with c2:
                 ornt = st.number_input("Rent", min_value=0)
-                om = st.text_input("Marla")
+                om = st.text_input("Marla (e.g. 5 Marla)")
                 of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"])
+                obeds = st.number_input("Beds", min_value=1, max_value=15) # ADDED BEDS
             with c3:
                 ow = st.selectbox("Water", ["Yes", "Boring", "Line"])
                 og = st.selectbox("Gas", ["Separate", "Common", "No"])
@@ -128,70 +107,51 @@ with tab_entry:
             if st.form_submit_button("Save Property"):
                 supabase.table('house_inventory').insert({
                     "owner_name": on, "contact": oc, "location": ol, "rent": ornt, "marla": om,
-                    "floor": of, "water": ow, "gas": og, "electricity": oe, "added_by": st.session_state.user_name
+                    "floor": of, "beds": obeds, "water": ow, "gas": og, "electricity": oe, "added_by": st.session_state.user_name
                 }).execute()
-                st.success("Saved!")
+                st.success("Property Saved!")
                 st.rerun()
 
     elif choice == "Client":
         with st.form("c_f"):
-            cn = st.text_input("Client Name")
-            cc = st.text_input("Contact")
-            cb = st.number_input("Budget", min_value=0)
-            if st.form_submit_button("Save Lead"):
+            cc1, cc2 = st.columns(2)
+            with cc1:
+                cn = st.text_input("Client Name")
+                ccont = st.text_input("Client Contact")
+                cb = st.number_input("Budget", min_value=0)
+                c_beds = st.number_input("Required Beds", min_value=1) # ADDED BEDS
+            with cc2:
+                c_marla = st.text_input("Required Marla") # ADDED MARLA
+                c_area = st.text_input("Preferred Area") # ADDED AREA
+                c_portion = st.selectbox("Portion", ["Any", "Ground", "First", "Full"])
+            
+            if st.form_submit_button("Save Client Lead"):
                 supabase.table('client_leads').insert({
-                    "name": cn, "contact": cc, "budget": cb, "added_by": st.session_state.user_name
+                    "name": cn, "contact": ccont, "budget": cb, "beds": c_beds, 
+                    "marla": c_marla, "area": c_area, "portion": c_portion, "added_by": st.session_state.user_name
                 }).execute()
-                st.success("Lead Saved!")
+                st.success("Client Requirement Saved!")
                 st.rerun()
 
     elif choice == "Visit":
         with st.form("v_f"):
             vc = st.text_input("Client Name")
             vh = st.text_input("House Location")
-            st.info(f"Staff: {st.session_state.user_name}")
+            vf = st.text_area("Feedback")
             if st.form_submit_button("Record Visit"):
                 supabase.table('visit_logs').insert({
-                    "client": vc, "house": vh, "staff": st.session_state.user_name, "date": str(datetime.now().date())
+                    "client": vc, "house": vh, "staff": st.session_state.user_name, 
+                    "feedback": vf, "date": str(datetime.now().date())
                 }).execute()
                 st.success("Visit Logged!")
                 st.rerun()
 
-# --- TAB 3: HISTORY & EDIT ---
+# --- TAB 3: HISTORY ---
 with tab_mgmt:
     target = st.selectbox("Select View", ["house_inventory", "client_leads", "visit_logs"])
     df_raw = fetch_data(target)
-    
     if not df_raw.empty:
-        # Staff specific filter
-        if st.session_state.user_role != "admin":
-            col_filter = 'added_by' if 'added_by' in df_raw.columns else 'staff'
-            if col_filter in df_raw.columns:
-                df_raw = df_raw[df_raw[col_filter] == st.session_state.user_name]
-        
         search = st.text_input("🔍 Search History...")
         if search:
             df_raw = df_raw[df_raw.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-        
         st.dataframe(df_raw, use_container_width=True)
-        
-        st.divider()
-        st.subheader("Edit / Delete Record")
-        mid = st.text_input("Enter ID")
-        if mid:
-            col_e, col_d = st.columns(2)
-            with col_e:
-                new_stat = st.selectbox("Update Status", ["Available", "Rented", "Pending", "Done Deal"])
-                if st.button("Apply Status Change"):
-                    supabase.table(target).update({"status": new_stat}).eq('id', mid).execute()
-                    st.success("Updated!")
-                    st.rerun()
-            with col_d:
-                if st.button("🗑️ Delete Record"):
-                    supabase.table(target).delete().eq('id', mid).execute()
-                    st.warning("Deleted!")
-                    st.rerun()
-    else: st.info("No records found in this table.")
-
-st.divider()
-st.caption("Deewary Hub v2.0 | Anas, Sawer Khan, Tariq Hussain")
