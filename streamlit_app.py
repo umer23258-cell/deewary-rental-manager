@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
-import io  # Excel download ke liye
+import io
 
 # --- 1. CONNECTION SETUP ---
 try:
@@ -30,6 +30,7 @@ st.markdown("""
         color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%;
     }
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .img-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -75,11 +76,10 @@ with st.sidebar:
 # --- 6. TABS ---
 tab_dash, tab_entry, tab_history = st.tabs(["📊 Dashboard (Stock)", "📝 Add New Entry", "📂 Full History & Edit"])
 
-# --- TAB 1: DASHBOARD (Live Stock Only) ---
+# --- TAB 1: DASHBOARD ---
 with tab_dash:
     st.markdown("## Live Operational Overview")
     
-    # Filter only available for main counts
     avail_df = df_h[df_h['status'] == 'Available'] if not df_h.empty else pd.DataFrame()
     rented_df = df_h[df_h['status'] == 'Rented'] if not df_h.empty else pd.DataFrame()
     
@@ -91,33 +91,23 @@ with tab_dash:
         total_rented_val = rented_df['rent'].sum() if not rented_df.empty else 0
         st.markdown(f"<div class='metric-card'><h3>💰 Monthly Vol</h3><h2>{total_rented_val:,.0f}</h2></div>", unsafe_allow_html=True)
 
-    # --- NEW: DAILY RECORD SECTION ---
-    st.divider()
-    st.subheader("📅 Today's Record Summary")
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    
-    # Logic to filter today's entries
-    today_h = 0
-    today_c = 0
-    today_v = 0
-    
-    if not df_h.empty:
-        today_h = len(df_h[df_h['created_at'].str.contains(today_str, na=False)])
-    if not df_c.empty:
-        today_c = len(df_c[df_c['created_at'].str.contains(today_str, na=False)])
-    if not df_v.empty:
-        # Visit log has a dedicated 'date' column
-        today_v = len(df_v[df_v['date'].astype(str) == today_str])
-
-    tc1, tc2, tc3 = st.columns(3)
-    tc1.metric("New Houses Today", today_h)
-    tc2.metric("New Leads Today", today_c)
-    tc3.metric("Visits Done Today", today_v)
-
     st.divider()
     st.subheader("📍 Quick Available Stock List")
     if not avail_df.empty:
-        st.dataframe(avail_df[['owner_name', 'location', 'rent', 'marla', 'beds', 'water', 'added_by']], use_container_width=True)
+        # Displaying houses with thumbnails
+        for _, row in avail_df.head(10).iterrows():
+            with st.container():
+                cols = st.columns([1, 4])
+                with cols[0]:
+                    imgs = row.get('image_urls', [])
+                    if imgs and len(imgs) > 0:
+                        st.image(imgs[0], use_container_width=True)
+                    else:
+                        st.write("🖼️ No Pic")
+                with cols[1]:
+                    st.markdown(f"**{row['location']}** | Rs. {row['rent']:,} | {row['marla']} | {row['beds']} Beds")
+                    st.caption(f"Added by: {row['added_by']} | Water: {row['water']}")
+            st.markdown("---")
     else: st.info("No houses currently available for rent.")
 
 # --- TAB 2: ENTRY CENTER ---
@@ -136,10 +126,31 @@ with tab_entry:
                 ow = st.selectbox("Water", ["Yes", "Boring", "Line Water", "Tanker", "No"])
                 og = st.selectbox("Gas", ["Separate", "Common", "No"])
                 oe = st.selectbox("Electricity", ["Separate", "Sub Meter"])
+            
+            # --- NEW IMAGE UPLOAD (MAX 6) ---
+            st.markdown("### 📸 Property Photos (Max 6)")
+            uploaded_files = st.file_uploader("Select images from your device", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+            
             if st.form_submit_button("Save to Inventory"):
-                supabase.table('house_inventory').insert({"owner_name":on,"contact":oc,"location":ol,"rent":ornt,"marla":om,"floor":of,"beds":ob,"water":ow,"gas":og,"electricity":oe,"added_by":st.session_state.user_name}).execute()
-                st.success("Property Registered!"); st.rerun()
+                if len(uploaded_files) > 6:
+                    st.error("Maximum 6 images allowed!")
+                else:
+                    image_urls = []
+                    for file in uploaded_files:
+                        file_path = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
+                        # Upload to Supabase Storage Bucket 'house_pics'
+                        supabase.storage.from_('house_pics').upload(file_path, file.getvalue())
+                        url = supabase.storage.from_('house_pics').get_public_url(file_path)
+                        image_urls.append(url)
 
+                    supabase.table('house_inventory').insert({
+                        "owner_name":on, "contact":oc, "location":ol, "rent":ornt, "marla":om, 
+                        "floor":of, "beds":ob, "water":ow, "gas":og, "electricity":oe, 
+                        "added_by":st.session_state.user_name, "image_urls": image_urls
+                    }).execute()
+                    st.success("Property Registered with Images!"); st.rerun()
+
+    # (Keep Gahak and Visit Log sections exactly as you had them)
     elif choice == "Gahak (Client)":
         with st.form("c_form", clear_on_submit=True):
             ca, cb = st.columns(2)
@@ -167,42 +178,47 @@ with tab_history:
     raw_df = fetch_data(db_target)
     
     if not raw_df.empty:
-        # --- NEW: EXCEL EXPORT LOGIC ---
-        st.subheader(f"Export {db_target.replace('_', ' ').title()} to Excel")
+        # Excel Export (Logic remains same)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            raw_df.to_excel(writer, index=False, sheet_name='Sheet1')
+            raw_df.to_excel(writer, index=False)
+        st.download_button(label="📥 Download Excel", data=output.getvalue(), file_name=f"{db_target}.xlsx")
         
-        st.download_button(
-            label="📥 Download as Excel",
-            data=output.getvalue(),
-            file_name=f"{db_target}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
         st.divider()
-
-        search_q = st.text_input(f"🔍 Search in {db_target.replace('_', ' ')}...")
+        search_q = st.text_input(f"🔍 Search in {db_target}...")
         if search_q:
             raw_df = raw_df[raw_df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
-        st.dataframe(raw_df, use_container_width=True)
         
+        # Display dataframe but hide image URLs to keep it clean
+        st.dataframe(raw_df.drop(columns=['image_urls']) if 'image_urls' in raw_df.columns else raw_df, use_container_width=True)
+        
+        # --- NEW: Image Viewer in History ---
+        if db_target == "house_inventory":
+            st.markdown("### 🖼️ Photo Viewer")
+            v_id = st.text_input("Enter House ID to view photos:")
+            if v_id:
+                target_house = raw_df[raw_df['id'].astype(str) == v_id]
+                if not target_house.empty:
+                    img_list = target_house['image_urls'].values[0]
+                    if img_list:
+                        st.image(img_list, width=200)
+                    else: st.info("No photos for this property.")
+
         st.divider()
-        st.subheader("🛠️ Record Management (Rent Out / Edit / Delete)")
-        rec_id = st.text_input("Enter ID of the record you want to modify:")
+        st.subheader("🛠️ Management")
+        rec_id = st.text_input("Enter ID to modify:")
         if rec_id:
             col_edit, col_del = st.columns(2)
             with col_edit:
                 new_status = st.selectbox("Change Status:", ["Available", "Rented", "Maintenance", "Pending"])
                 if st.button("Update Record Status"):
                     supabase.table(db_target).update({"status": new_status}).eq('id', rec_id).execute()
-                    st.success("Status Updated Successfully!"); st.rerun()
+                    st.success("Status Updated!"); st.rerun()
             with col_del:
-                if st.session_state.user_role == "admin":
-                    if st.button("🗑️ Permanent Delete Record"):
-                        supabase.table(db_target).delete().eq('id', rec_id).execute()
-                        st.warning("Record Removed!"); st.rerun()
-                else: st.info("Only Admin can delete records.")
-    else: st.info("No data found in this category.")
+                if st.session_state.user_role == "admin" and st.button("🗑️ Permanent Delete"):
+                    supabase.table(db_target).delete().eq('id', rec_id).execute()
+                    st.warning("Record Removed!"); st.rerun()
+    else: st.info("No data found.")
 
 st.divider()
-st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v2.8 | Built for Anas | Staff: Sawer & Tariq</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v3.0 | Built for Anas</p>", unsafe_allow_html=True)
