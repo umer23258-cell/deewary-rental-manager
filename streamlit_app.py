@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
+import io  # Excel download ke liye
 
 # --- 1. CONNECTION SETUP ---
 try:
@@ -90,6 +91,29 @@ with tab_dash:
         total_rented_val = rented_df['rent'].sum() if not rented_df.empty else 0
         st.markdown(f"<div class='metric-card'><h3>💰 Monthly Vol</h3><h2>{total_rented_val:,.0f}</h2></div>", unsafe_allow_html=True)
 
+    # --- NEW: DAILY RECORD SECTION ---
+    st.divider()
+    st.subheader("📅 Today's Record Summary")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # Logic to filter today's entries
+    today_h = 0
+    today_c = 0
+    today_v = 0
+    
+    if not df_h.empty:
+        today_h = len(df_h[df_h['created_at'].str.contains(today_str, na=False)])
+    if not df_c.empty:
+        today_c = len(df_c[df_c['created_at'].str.contains(today_str, na=False)])
+    if not df_v.empty:
+        # Visit log has a dedicated 'date' column
+        today_v = len(df_v[df_v['date'].astype(str) == today_str])
+
+    tc1, tc2, tc3 = st.columns(3)
+    tc1.metric("New Houses Today", today_h)
+    tc2.metric("New Leads Today", today_c)
+    tc3.metric("Visits Done Today", today_v)
+
     st.divider()
     st.subheader("📍 Quick Available Stock List")
     if not avail_df.empty:
@@ -143,6 +167,20 @@ with tab_history:
     raw_df = fetch_data(db_target)
     
     if not raw_df.empty:
+        # --- NEW: EXCEL EXPORT LOGIC ---
+        st.subheader(f"Export {db_target.replace('_', ' ').title()} to Excel")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            raw_df.to_excel(writer, index=False, sheet_name='Sheet1')
+        
+        st.download_button(
+            label="📥 Download as Excel",
+            data=output.getvalue(),
+            file_name=f"{db_target}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.divider()
+
         search_q = st.text_input(f"🔍 Search in {db_target.replace('_', ' ')}...")
         if search_q:
             raw_df = raw_df[raw_df.astype(str).apply(lambda x: x.str.contains(search_q, case=False)).any(axis=1)]
@@ -167,4 +205,4 @@ with tab_history:
     else: st.info("No data found in this category.")
 
 st.divider()
-st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v2.7 | Built for Anas | Staff: Sawer & Tariq</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; opacity: 0.6;'>Deewary Rental OS v2.8 | Built for Anas | Staff: Sawer & Tariq</p>", unsafe_allow_html=True)
