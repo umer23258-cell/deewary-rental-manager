@@ -10,46 +10,34 @@ try:
     key = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
 except Exception as e:
-    st.error("Supabase secrets missing!")
+    st.error("Secrets missing!")
     st.stop()
 
-# --- 2. THEME & UI ---
-st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏠")
-
+# --- 2. THEME & STYLING ---
+st.set_page_config(page_title="Deewary Hub Pro", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #05070A; color: #E0E0E0; }
-    [data-testid="stMetric"] { background-color: #1E2130; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 10px; }
-    .metric-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 75, 75, 0.3);
-        padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 10px;
-    }
-    .stButton>button {
-        background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
-        color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%;
-    }
+    .metric-card { background: #1E2130; border-left: 5px solid #FF4B4B; padding: 15px; border-radius: 10px; text-align: center; }
+    .stButton>button { background: linear-gradient(90deg, #FF4B4B, #FF8080); color: white; font-weight: bold; width: 100%; border-radius: 8px; }
+    .img-box { border: 1px solid #333; border-radius: 10px; padding: 5px; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. LOGIN ---
-if "authenticated" not in st.session_state:
-    st.session_state.update({"authenticated": False, "user_role": None, "user_name": None})
-
-if not st.session_state.authenticated:
-    col1, col2, col3 = st.columns([1,1.5,1])
-    with col2:
-        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🏠 DEEWARY PRO</h1>", unsafe_allow_html=True)
-        user = st.selectbox("Select User", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
-        pwd = st.text_input("Access Key", type="password")
-        if st.button("Unlock System"):
-            if user == "Anas (Admin)" and pwd == "admin786":
-                st.session_state.update({"authenticated": True, "user_role": "admin", "user_name": "Anas"})
-                st.rerun()
-            elif (user == "Sawer Khan" and pwd == "sawer123") or (user == "Tariq Hussain" and pwd == "tariq123"):
-                st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": user})
-                st.rerun()
-            else: st.error("❌ Invalid Access Key!")
+if "auth" not in st.session_state: st.session_state.update({"auth": False, "user": None, "role": None})
+if not st.session_state.auth:
+    st.title("🏠 DEEWARY HUB LOGIN")
+    u = st.selectbox("User", ["Anas (Admin)", "Sawer Khan", "Tariq Hussain"])
+    p = st.text_input("Pin", type="password")
+    if st.button("Unlock"):
+        if (u == "Anas (Admin)" and p == "admin786"):
+            st.session_state.update({"auth": True, "user": "Anas", "role": "admin"})
+            st.rerun()
+        elif p in ["sawer123", "tariq123"]:
+            st.session_state.update({"auth": True, "user": u, "role": "staff"})
+            st.rerun()
+        else: st.error("Wrong Pin!")
     st.stop()
 
 # --- 4. DATA LOGIC ---
@@ -61,84 +49,92 @@ def fetch_data(table):
 
 df_h = fetch_data('house_inventory')
 df_c = fetch_data('client_leads')
-df_v = fetch_data('visit_logs')
 
-# --- 5. TABS ---
-tab_dash, tab_entry, tab_history = st.tabs(["📊 Dashboard", "📝 Add New Entry", "📂 Full History"])
+tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📝 Add Entry", "📂 History & Edit"])
 
 # --- TAB 1: DASHBOARD ---
-with tab_dash:
-    avail_df = df_h[df_h['status'] == 'Available'] if not df_h.empty else pd.DataFrame()
-    c1, c2, c3 = st.columns(3)
-    with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Available</h3><h2>{len(avail_df)}</h2></div>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div class='metric-card'><h3>👥 Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
-    with c3: st.markdown(f"<div class='metric-card'><h3>🚗 Visits</h3><h2>{len(df_v)}</h2></div>", unsafe_allow_html=True)
-
+with tab1:
+    if not df_h.empty:
+        avail = df_h[df_h['status'] == 'Available']
+        rented = df_h[df_h['status'] == 'Rented']
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f"<div class='metric-card'><h3>Available</h3><h2>{len(avail)}</h2></div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='metric-card'><h3>Rented Out</h3><h2>{len(rented)}</h2></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='metric-card'><h3>Total Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
+    
     st.divider()
-    st.subheader("📍 Quick View")
-    if not avail_df.empty:
-        for _, row in avail_df.head(10).iterrows():
+    st.subheader("📍 Quick Inventory View")
+    if not df_h.empty:
+        for _, row in df_h.head(5).iterrows():
             with st.container():
-                col_img, col_txt = st.columns([1, 4])
-                with col_img:
+                col_i, col_t = st.columns([1, 4])
+                with col_i:
                     imgs = row.get('image_urls', [])
-                    if imgs and len(imgs) > 0: st.image(imgs[0], use_container_width=True)
+                    if imgs: st.image(imgs[0], use_container_width=True)
                     else: st.info("No Pic")
-                with col_txt:
-                    st.write(f"**{row['location']}** | Rs. {row['rent']} | {row['marla']}")
+                with col_t:
+                    st.write(f"**ID: {row['id']}** | {row['location']} | {row['status']}")
+                    st.caption(f"Rent: {row['rent']} | Added by: {row['added_by']}")
             st.markdown("---")
 
-# --- TAB 2: ENTRY CENTER ---
+# --- TAB 2: ADD ENTRY (FIXED BUTTON) ---
 with tab_entry:
-    choice = st.radio("Choose:", ["Ghar (Property)", "Gahak (Client)", "Visit Log"], horizontal=True)
-    
-    if choice == "Ghar (Property)":
-        with st.form("h_form", clear_on_submit=True):
-            col_a, col_b, col_c = st.columns(3)
-            with col_a:
-                on = st.text_input("Owner Name"); oc = st.text_input("Contact"); ol = st.text_input("Location")
-            with col_b:
-                ornt = st.number_input("Rent", min_value=0); om = st.text_input("Marla")
-                of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"]); ob = st.number_input("Beds", 1, 15)
-            with col_c:
-                ow = st.selectbox("Water", ["Yes", "Boring", "Line Water"]); og = st.selectbox("Gas", ["Yes", "No"]); oe = st.selectbox("Electricity", ["Separate", "Sub Meter"])
-            
-            # --- IMAGE UPLOAD (MAX 6) ---
-            uploaded_files = st.file_uploader("📸 Select House Photos (Max 6)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
-            
-            if st.form_submit_button("Save to Inventory"):
-                img_urls = []
-                if uploaded_files:
-                    for file in uploaded_files[:6]: # Limit to 6
-                        f_name = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{file.name}"
-                        supabase.storage.from_('house_pics').upload(f_name, file.getvalue())
-                        img_urls.append(supabase.storage.from_('house_pics').get_public_url(f_name))
-
-                supabase.table('house_inventory').insert({
-                    "owner_name":on, "contact":oc, "location":ol, "rent":ornt, "marla":om, 
-                    "floor":of, "beds":ob, "water":ow, "gas":og, "electricity":oe, 
-                    "added_by":st.session_state.user_name, "image_urls": img_urls
-                }).execute()
-                st.success("Property Saved with Images!"); st.rerun()
-
-    # (Gahak and Visit Log codes keep same as your original)
-    elif choice == "Gahak (Client)":
-        with st.form("c_form"):
-            cn = st.text_input("Name"); cc = st.text_input("Contact"); cb = st.number_input("Budget")
-            if st.form_submit_button("Save Lead"):
-                supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb,"added_by":st.session_state.user_name}).execute()
-                st.success("Lead Saved!"); st.rerun()
-
-# --- TAB 3: HISTORY ---
-with tab_history:
-    db_target = st.selectbox("Select Table:", ["house_inventory", "client_leads", "visit_logs"])
-    raw_df = fetch_data(db_target)
-    
-    if not raw_df.empty:
-        # EXCEL DOWNLOAD FIX
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            raw_df.to_excel(writer, index=False)
-        st.download_button("📥 Download Excel", output.getvalue(), f"{db_target}.xlsx")
+    st.subheader("Add New Property")
+    # Form ensures data only saves when button is clicked
+    with st.form("house_form", clear_on_submit=True):
+        c_a, c_b = st.columns(2)
+        with c_a:
+            on = st.text_input("Owner Name"); oc = st.text_input("Contact"); ol = st.text_input("Location")
+            ornt = st.number_input("Rent", min_value=0)
+        with c_b:
+            om = st.text_input("Marla"); of = st.selectbox("Floor", ["Ground", "First", "Upper", "Full House"])
+            ow = st.selectbox("Water", ["Yes", "Boring", "Line Water"]); og = st.selectbox("Gas", ["Yes", "No"])
         
-        st.dataframe(raw_df, use_container_width=True)
+        files = st.file_uploader("📸 Upload Photos (Max 6)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        
+        # Data saves ONLY when this button is pressed
+        if st.form_submit_button("Save to Inventory"):
+            urls = []
+            if files:
+                for f in files[:6]:
+                    f_path = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{f.name}"
+                    supabase.storage.from_('house_pics').upload(f_path, f.getvalue())
+                    urls.append(supabase.storage.from_('house_pics').get_public_url(f_path))
+            
+            supabase.table('house_inventory').insert({
+                "owner_name": on, "contact": oc, "location": ol, "rent": ornt,
+                "marla": om, "floor": of, "water": ow, "gas": og,
+                "image_urls": urls, "added_by": st.session_state.user, "status": "Available"
+            }).execute()
+            st.success("✅ Property Saved Successfully!"); st.rerun()
+
+# --- TAB 3: HISTORY (EDIT & DELETE INCLUDED) ---
+with tab3:
+    db = st.selectbox("Select Table", ["house_inventory", "client_leads", "visit_logs"])
+    data = fetch_data(db)
+    
+    if not data.empty:
+        # Excel Export Fix
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+            data.to_excel(writer, index=False)
+        st.download_button("📥 Download Excel", buf.getvalue(), f"{db}.xlsx")
+        
+        st.divider()
+        st.subheader("🛠️ Management Actions")
+        # Edit/Delete/RentOut functionality
+        target_id = st.text_input("Enter ID to Modify:")
+        if target_id:
+            col_r, col_d = st.columns(2)
+            with col_r:
+                new_status = st.selectbox("Change Status:", ["Available", "Rented", "Pending"])
+                if st.button("Update Status"):
+                    supabase.table(db).update({"status": new_status}).eq('id', target_id).execute()
+                    st.success("Status Updated!"); st.rerun()
+            with col_d:
+                if st.session_state.role == "admin":
+                    if st.button("🗑️ Delete Record Permanently"):
+                        supabase.table(db).delete().eq('id', target_id).execute()
+                        st.warning("Record Deleted!"); st.rerun()
+        
+        st.dataframe(data, use_container_width=True)
