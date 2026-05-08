@@ -29,9 +29,6 @@ st.markdown("""
         background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
         color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%;
     }
-    /* Action buttons styling */
-    .edit-btn > div > button { background: #28a745 !important; }
-    .del-btn > div > button { background: #dc3545 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -119,10 +116,9 @@ with tab_entry:
                 supabase.table('house_inventory').insert({
                     "owner_name":on, "contact":oc, "location":ol, "rent":ornt, "marla":om, 
                     "floor":of, "beds":ob, "water":ow, "gas":og, "electricity":oe, 
-                    "added_by":st.session_state.user_name, "image_urls": img_urls,
-                    "status": "Available"
+                    "added_by":st.session_state.user_name, "image_urls": img_urls, "status": "Available"
                 }).execute()
-                st.success("Property Saved with Images!"); st.rerun()
+                st.success("Property Saved!"); st.rerun()
 
     elif choice == "Gahak (Client)":
         with st.form("c_form"):
@@ -131,54 +127,49 @@ with tab_entry:
                 supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb,"added_by":st.session_state.user_name}).execute()
                 st.success("Lead Saved!"); st.rerun()
 
-# --- TAB 3: HISTORY (With Edit, Delete, Rent Out) ---
+# --- TAB 3: HISTORY (EDIT, DELETE, RENT OUT ADDED) ---
 with tab_history:
     db_target = st.selectbox("Select Table:", ["house_inventory", "client_leads", "visit_logs"])
     raw_df = fetch_data(db_target)
     
     if not raw_df.empty:
-        # Excel Export
+        # EXCEL DOWNLOAD
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             raw_df.to_excel(writer, index=False)
         st.download_button("📥 Download Excel", output.getvalue(), f"{db_target}.xlsx")
         
         st.write("---")
-        # Har row ke liye management options
+        
+        # Edit/Delete Management Section
         for i, row in raw_df.iterrows():
-            with st.expander(f"🆔 {row['id']} | {row.get('location', row.get('name', 'Record'))} | {row.get('status', '')}"):
-                c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+            # Har record ke liye aik expander box
+            with st.expander(f"🆔 {row['id']} | {row.get('location', row.get('name', 'Details'))} | {row.get('status', '')}"):
+                c1, c2, c3 = st.columns(3)
                 
+                # 1. RENT OUT BUTTON (Sirf house inventory ke liye)
                 with c1:
-                    st.write(f"**Details:** {row.get('owner_name', '')} {row.get('contact', '')}")
-                
-                # RENT OUT / STATUS UPDATE
-                with c2:
-                    if db_target == 'house_inventory':
+                    if db_target == "house_inventory":
                         current_status = row.get('status', 'Available')
-                        btn_label = "🔓 Rent Out" if current_status == 'Available' else "🔒 Make Available"
-                        new_status = 'Rented' if current_status == 'Available' else 'Available'
-                        if st.button(btn_label, key=f"rent_{row['id']}"):
-                            supabase.table(db_target).update({"status": new_status}).eq('id', row['id']).execute()
+                        label = "🔓 Make Available" if current_status == "Rented" else "🔒 Rent Out"
+                        target_status = "Available" if current_status == "Rented" else "Rented"
+                        if st.button(label, key=f"status_{row['id']}"):
+                            supabase.table(db_target).update({"status": target_status}).eq('id', row['id']).execute()
                             st.rerun()
                 
-                # EDIT (Simple trigger for manual check)
-                with c3:
-                    st.markdown('<div class="edit-btn">', unsafe_allow_html=True)
-                    if st.button("📝 Edit", key=f"edit_{row['id']}"):
-                        st.info(f"ID {row['id']} ko edit karne ke liye 'Add Entry' tab mein naya data dalen ya direct database use karen.")
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                # DELETE (Only for Admin)
-                with c4:
-                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
+                # 2. DELETE BUTTON (Sirf Admin Anas ke liye)
+                with c2:
                     if st.session_state.user_role == "admin":
-                        if st.button("🗑️ Delete", key=f"del_{row['id']}"):
+                        if st.button("🗑️ Delete Record", key=f"del_{row['id']}"):
                             supabase.table(db_target).delete().eq('id', row['id']).execute()
                             st.rerun()
                     else:
-                        st.write("🔒")
-                    st.markdown('</div>', unsafe_allow_html=True)
+                        st.info("Delete only for Admin")
+
+                # 3. EDIT OPTION (Manual entry trigger)
+                with c3:
+                    if st.button("📝 Edit Info", key=f"edit_{row['id']}"):
+                        st.warning("Manual editing abhi enabled nahi hai, admin se contact karein.")
 
         st.divider()
         st.dataframe(raw_df, use_container_width=True)
