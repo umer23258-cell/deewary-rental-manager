@@ -2,147 +2,193 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 from datetime import datetime
+import plotly.express as px # Charts ke liye
 
 # --- 1. CONNECTION ---
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="Deewary Hub Pro", layout="wide", page_icon="🏢")
+st.set_page_config(page_title="Deewary Hub | Premium CRM", layout="wide", page_icon="🏢")
 
-# --- 2. SESSION STATE ---
+# --- 2. UNIQUE DARK & GLOW STYLE CSS ---
+st.markdown("""
+    <style>
+    /* Main Background */
+    .stApp { background-color: #05070A; color: #E0E0E0; }
+    
+    /* Glowing Cards for Dashboard */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 75, 75, 0.3);
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(255, 75, 75, 0.1);
+    }
+    
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] { background-color: #0B0E14; border-right: 1px solid #1E2130; }
+    
+    /* Buttons Styling */
+    .stButton>button {
+        background: linear-gradient(90deg, #FF4B4B 0%, #FF8080 100%);
+        color: white; border: none; border-radius: 8px;
+        font-weight: bold; transition: 0.3s;
+    }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 75, 75, 0.4); }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-thumb { background: #FF4B4B; border-radius: 10px; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- 3. LOGIN & AUTHENTICATION ---
 if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-    st.session_state.user_role = None
-    st.session_state.user_name = None
+    st.session_state.update({"authenticated": False, "user_role": None, "user_name": None})
 
-# --- 3. LOGIN INTERFACE ---
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center; color: #FF4B4B;'>🔐 Deewary Hub Login</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1,1.5,1])
     with col2:
-        user = st.selectbox("Pehchan Select Karein", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
-        password = st.text_input("Password", type="password")
-        if st.button("System Mein Dakhil Hon"):
-            if user == "Anas (Admin)" and password == "admin786":
+        st.markdown("<h1 style='text-align: center; color: #FF4B4B;'>DEEWARY PRO</h1>", unsafe_allow_html=True)
+        user = st.selectbox("Login Identity", ["Sawer Khan", "Tariq Hussain", "Anas (Admin)"])
+        pwd = st.text_input("Access Key", type="password")
+        if st.button("Unlock System"):
+            if user == "Anas (Admin)" and pwd == "admin786":
                 st.session_state.update({"authenticated": True, "user_role": "admin", "user_name": "Anas"})
                 st.rerun()
-            elif user == "Sawer Khan" and password == "sawer123":
-                st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": "Sawer Khan"})
+            elif (user == "Sawer Khan" and pwd == "sawer123") or (user == "Tariq Hussain" and pwd == "tariq123"):
+                st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": user})
                 st.rerun()
-            elif user == "Tariq Hussain" and password == "tariq123":
-                st.session_state.update({"authenticated": True, "user_role": "staff", "user_name": "Tariq Hussain"})
-                st.rerun()
-            else:
-                st.error("❌ Password Ghalat Hai!")
+            else: st.error("Access Denied!")
     st.stop()
 
-# --- 4. DATA LOGIC (Search, Edit, Delete) ---
-def fetch_filtered_data(table):
-    res = supabase.table(table).select("*").order('created_at', desc=True).execute()
-    df = pd.DataFrame(res.data)
-    if not df.empty and st.session_state.user_role != "admin":
-        # Staff ko sirf apni history dikhani hai (agar table mein 'added_by' ya 'staff' column hai)
-        column = 'added_by' if 'added_by' in df.columns else 'staff'
-        df = df[df[column] == st.session_state.user_name]
-    return df
+# --- 4. DATA LOGIC ---
+def fetch_data(table):
+    try:
+        res = supabase.table(table).select("*").order('created_at', desc=True).execute()
+        return pd.DataFrame(res.data)
+    except: return pd.DataFrame()
 
-def manage_records(table, df):
-    if df.empty:
-        st.info("Filhal koi records nahi hain.")
-        return
+# --- 5. SIDEBAR ---
+with st.sidebar:
+    st.image("https://i.ibb.co/HfKMwQJh/deewaryn-com-logo.jpg", width=120)
+    st.write(f"### Welcome, {st.session_state.user_name}")
+    st.caption(f"Role: {st.session_state.user_role.upper()}")
+    if st.button("🚪 Log Out"):
+        st.session_state.authenticated = False
+        st.rerun()
 
-    search = st.text_input(f"🔍 Search in {table.replace('_', ' ')}...", key=f"search_{table}")
-    if search:
-        df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+# --- 6. MAIN DASHBOARD ---
+df_h = fetch_data('house_inventory')
+df_c = fetch_data('client_leads')
+df_v = fetch_data('visit_logs')
 
-    st.dataframe(df, use_container_width=True)
+tab_dash, tab_manage, tab_history = st.tabs(["📊 Executive Dashboard", "📝 Entry Center", "📂 Data Management"])
 
-    # Edit & Delete Logic
-    with st.expander(f"🛠️ Edit / Delete Records in {table.title()}"):
-        row_id = st.text_input("Enter ID to Modify", key=f"id_{table}")
-        if row_id:
-            c1, c2 = st.columns(2)
-            if c1.button("🗑️ Delete Record", key=f"del_{table}"):
-                supabase.table(table).delete().eq('id', row_id).execute()
-                st.success("Record Khatam Kar Diya Gaya!")
-                st.cache_data.clear()
-                st.rerun()
-            
-            st.info("Edit karne ke liye niche fields fill karein:")
-            # Yahan hum simplified edit de rahe hain, aap fields barha sakte hain
-            new_status = st.selectbox("Update Status", ["Available", "Rented", "Pending", "Done Deal"], key=f"status_{table}")
-            if st.button("📝 Update Status", key=f"upd_{table}"):
-                supabase.table(table).update({"status": new_status}).eq('id', row_id).execute()
-                st.success("Status Update Ho Gaya!")
-                st.rerun()
+# --- TAB 1: DASHBOARD ---
+with tab_dash:
+    st.markdown("## Operational Overview")
+    
+    # Dashboard Cards
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown(f"<div class='metric-card'><h3>🏠 Houses</h3><h2>{len(df_h)}</h2></div>", unsafe_allow_html=True)
+    with c2: st.markdown(f"<div class='metric-card'><h3>👥 Leads</h3><h2>{len(df_c)}</h2></div>", unsafe_allow_html=True)
+    with c3: st.markdown(f"<div class='metric-card'><h3>🚗 Visits</h3><h2>{len(df_v)}</h2></div>", unsafe_allow_html=True)
+    with c4:
+        rev = df_h[df_h['status'] == 'Rented']['rent'].sum()
+        st.markdown(f"<div class='metric-card'><h3>💰 Volume</h3><h2>{rev//1000}k</h2></div>", unsafe_allow_html=True)
 
-# --- 5. MAIN INTERFACE ---
-st.sidebar.title(f"Welcome, {st.session_state.user_name}")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.authenticated = False
-    st.rerun()
+    st.write("##")
+    col_chart, col_staff = st.columns([2, 1])
+    
+    with col_chart:
+        st.subheader("Visit Trends")
+        if not df_v.empty:
+            fig = px.line(df_v, x='date', title="Daily Activity", color_discrete_sequence=['#FF4B4B'])
+            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col_staff:
+        st.subheader("Leaderboard")
+        if not df_v.empty:
+            v_counts = df_v['staff'].value_counts().reset_index()
+            st.table(v_counts)
 
-tabs = st.tabs(["🏠 Ghar Entry & History", "👥 Client Entry & History", "🚗 Visit Logs"])
-
-# --- TAB 1: HOUSE ---
-with tabs[0]:
-    col_in, col_hist = st.columns([1, 2])
-    with col_in:
-        st.subheader("Add Property")
+# --- TAB 2: ENTRY CENTER ---
+with tab_manage:
+    mode = st.radio("What would you like to add?", ["New Property", "Client Requirement", "Visit Log"], horizontal=True)
+    
+    if mode == "New Property":
         with st.form("h_form"):
-            h_owner = st.text_input("Owner Name")
-            h_rent = st.number_input("Rent", min_value=0)
-            h_loc = st.text_input("Location")
-            h_gas = st.selectbox("Gas", ["No", "Separate", "Common"])
-            h_water = st.selectbox("Water", ["Yes", "Boring", "Line"])
-            if st.form_submit_button("Save"):
-                supabase.table('house_inventory').insert({
-                    "owner_name": h_owner, "rent": h_rent, "location": h_loc, 
-                    "gas": h_gas, "water": h_water, "added_by": st.session_state.user_name
-                }).execute()
-                st.rerun()
-    with col_hist:
-        st.subheader("Inventory History")
-        df_h = fetch_filtered_data('house_inventory')
-        manage_records('house_inventory', df_h)
+            ca, cb, cc = st.columns(3)
+            with ca:
+                name = st.text_input("Owner Name")
+                rent = st.number_input("Monthly Rent", min_value=0)
+            with cb:
+                loc = st.text_input("Exact Location")
+                water = st.selectbox("Water", ["Yes", "Boring", "Line Water"])
+            with cc:
+                gas = st.selectbox("Gas", ["Separate", "Common", "No"])
+                elec = st.selectbox("Electricity", ["Separate", "Sub Meter"])
+            if st.form_submit_button("Submit Property"):
+                supabase.table('house_inventory').insert({"owner_name": name, "rent": rent, "location": loc, "water": water, "gas": gas, "electricity": elec, "added_by": st.session_state.user_name}).execute()
+                st.success("Property Linked!")
 
-# --- TAB 2: CLIENT ---
-with tabs[1]:
-    col_in, col_hist = st.columns([1, 2])
-    with col_in:
-        st.subheader("Add Client")
+    elif mode == "Client Requirement":
         with st.form("c_form"):
             c_name = st.text_input("Client Name")
-            c_bud = st.number_input("Budget", min_value=0)
-            if st.form_submit_button("Save Client"):
-                supabase.table('client_leads').insert({
-                    "name": c_name, "budget": c_bud, "added_by": st.session_state.user_name
-                }).execute()
-                st.rerun()
-    with col_hist:
-        st.subheader("Client History")
-        df_c = fetch_filtered_data('client_leads')
-        manage_records('client_leads', df_c)
+            c_bud = st.number_input("Max Budget", min_value=0)
+            c_req = st.text_area("Detailed Requirements")
+            if st.form_submit_button("Save Lead"):
+                supabase.table('client_leads').insert({"name": c_name, "budget": c_bud, "other_req": c_req, "added_by": st.session_state.user_name}).execute()
+                st.success("Lead Captured!")
 
-# --- TAB 3: VISITS ---
-with tabs[2]:
-    st.subheader("Visit Activity")
-    v_col1, v_col2 = st.columns([1, 2])
-    with v_col1:
+    elif mode == "Visit Log":
         with st.form("v_form"):
             v_cl = st.text_input("Client Name")
-            v_house = st.text_input("House Address")
+            v_h = st.text_input("Property Address")
+            st.info(f"Assigning Visit to: {st.session_state.user_name}")
             if st.form_submit_button("Record Visit"):
-                supabase.table('visit_logs').insert({
-                    "client": v_cl, "house": v_house, "staff": st.session_state.user_name, 
-                    "date": str(datetime.now().date())
-                }).execute()
-                st.rerun()
-    with v_col2:
-        st.subheader("Staff Visit History")
-        df_v = fetch_filtered_data('visit_logs')
-        manage_records('visit_logs', df_v)
+                supabase.table('visit_logs').insert({"client": v_cl, "house": v_h, "staff": st.session_state.user_name, "date": str(datetime.now().date())}).execute()
+                st.success("Activity Logged!")
 
+# --- TAB 3: DATA MANAGEMENT ---
+with tab_history:
+    target = st.selectbox("Select Database", ["house_inventory", "client_leads", "visit_logs"])
+    df_raw = fetch_data(target)
+    
+    if not df_raw.empty:
+        # Staff filter
+        if st.session_state.user_role != "admin":
+            col_to_filter = 'added_by' if 'added_by' in df_raw.columns else 'staff'
+            df_raw = df_raw[df_raw[col_to_filter] == st.session_state.user_name]
+        
+        search = st.text_input("🔍 Quick Search...")
+        if search:
+            df_raw = df_raw[df_raw.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+        
+        st.dataframe(df_raw, use_container_width=True)
+        
+        # Edit/Delete Center
+        st.divider()
+        st.subheader("Modify Record")
+        mod_id = st.text_input("Enter ID to Edit/Delete")
+        if mod_id:
+            col_edit, col_del = st.columns(2)
+            with col_del:
+                if st.button("🗑️ Delete Permanently"):
+                    supabase.table(target).delete().eq('id', mod_id).execute()
+                    st.warning("Record Purged!")
+                    st.rerun()
+            with col_edit:
+                new_stat = st.selectbox("Update Status to:", ["Available", "Rented", "Pending", "Closed"])
+                if st.button("📝 Apply Change"):
+                    supabase.table(target).update({"status": new_stat}).eq('id', mod_id).execute()
+                    st.success("Record Updated!")
+                    st.rerun()
+
+# --- FOOTER ---
 st.divider()
-st.caption(f"Deewary.com | Authorized Access: {st.session_state.user_role}")
+st.markdown("<p style='text-align: center; opacity: 0.5;'>Deewary OS v2.0 | Staff: Sawer & Tariq | Manager: Anas</p>", unsafe_allow_html=True)
