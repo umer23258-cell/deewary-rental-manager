@@ -127,13 +127,13 @@ with tab_entry:
                 supabase.table('client_leads').insert({"name":cn,"contact":cc,"budget":cb,"added_by":st.session_state.user_name}).execute()
                 st.success("Lead Saved!"); st.rerun()
 
-# --- TAB 3: HISTORY (EDIT, DELETE, RENT OUT ADDED) ---
+# --- TAB 3: HISTORY (Action Center added above Table) ---
 with tab_history:
     db_target = st.selectbox("Select Table:", ["house_inventory", "client_leads", "visit_logs"])
     raw_df = fetch_data(db_target)
     
     if not raw_df.empty:
-        # EXCEL DOWNLOAD
+        # Download Section
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             raw_df.to_excel(writer, index=False)
@@ -141,35 +141,30 @@ with tab_history:
         
         st.write("---")
         
-        # Edit/Delete Management Section
-        for i, row in raw_df.iterrows():
-            # Har record ke liye aik expander box
-            with st.expander(f"🆔 {row['id']} | {row.get('location', row.get('name', 'Details'))} | {row.get('status', '')}"):
-                c1, c2, c3 = st.columns(3)
-                
-                # 1. RENT OUT BUTTON (Sirf house inventory ke liye)
-                with c1:
-                    if db_target == "house_inventory":
-                        current_status = row.get('status', 'Available')
-                        label = "🔓 Make Available" if current_status == "Rented" else "🔒 Rent Out"
-                        target_status = "Available" if current_status == "Rented" else "Rented"
-                        if st.button(label, key=f"status_{row['id']}"):
-                            supabase.table(db_target).update({"status": target_status}).eq('id', row['id']).execute()
-                            st.rerun()
-                
-                # 2. DELETE BUTTON (Sirf Admin Anas ke liye)
-                with c2:
-                    if st.session_state.user_role == "admin":
-                        if st.button("🗑️ Delete Record", key=f"del_{row['id']}"):
-                            supabase.table(db_target).delete().eq('id', row['id']).execute()
-                            st.rerun()
-                    else:
-                        st.info("Delete only for Admin")
+        # --- ACTION CENTER (Edit, Delete, RentOut options here) ---
+        st.subheader("🛠️ Management Actions")
+        act_col1, act_col2, act_col3 = st.columns([1, 1, 1])
+        
+        with act_col1:
+            target_id = st.number_input("Enter ID to manage:", min_value=1, step=1)
+            
+        with act_col2:
+            if db_target == "house_inventory":
+                new_status = st.selectbox("Change Status:", ["Available", "Rented", "Pending"])
+                if st.button("Update Status"):
+                    supabase.table(db_target).update({"status": new_status}).eq('id', target_id).execute()
+                    st.success(f"ID {target_id} updated!"); st.rerun()
+            else:
+                st.write("Status update only for Houses")
 
-                # 3. EDIT OPTION (Manual entry trigger)
-                with c3:
-                    if st.button("📝 Edit Info", key=f"edit_{row['id']}"):
-                        st.warning("Manual editing abhi enabled nahi hai, admin se contact karein.")
+        with act_col3:
+            if st.session_state.user_role == "admin":
+                if st.button("🗑️ Delete Permanently"):
+                    supabase.table(db_target).delete().eq('id', target_id).execute()
+                    st.warning(f"ID {target_id} Deleted!"); st.rerun()
+            else:
+                st.info("Delete restricted to Admin")
 
-        st.divider()
+        st.write("---")
+        # Pure Table Structure (Waisa hi rahe ga)
         st.dataframe(raw_df, use_container_width=True)
